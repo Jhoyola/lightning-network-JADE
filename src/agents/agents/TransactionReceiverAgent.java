@@ -1,7 +1,14 @@
 package agents;
 
+import LNTxOntology.*;
+import jade.content.AgentAction;
+import jade.content.ContentElement;
+import jade.content.Predicate;
+import jade.content.lang.sl.SLCodec;
+import jade.content.onto.basic.Action;
 import jade.core.*;
 import jade.core.behaviours.*;
+import jade.domain.FIPANames;
 import jade.lang.acl.ACLMessage;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
@@ -18,7 +25,13 @@ public class TransactionReceiverAgent extends Agent{
     private Logger myLogger = Logger.getMyLogger(getClass().getName());
 
     protected void setup() {
-        // Registration with the DF
+
+        // Register the codec for the SL0 language
+        getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL0);
+        // Register the ontology used by this application
+        getContentManager().registerOntology(LNTxOntology.getInstance());
+
+        // Registration with the DF for the initiation
         DFAgentDescription dfd = new DFAgentDescription();
         dfd.setName(getAID());
         ServiceDescription sd = new ServiceDescription();
@@ -78,54 +91,90 @@ public class TransactionReceiverAgent extends Agent{
                 case 0:
                     if (msgIn != null) {
 
-                        //validate the initiation message
-                        if (msgIn.getConversationId().isEmpty()) {
-                            myLogger.log(Logger.WARNING, "Receiver Agent: Initiation message doesn't have a conversation id!");
-                            block();
-                        }
-                        //-currency
-                        //-product
-                        //-sats value
-                        //-currency value
-
-                        convId = UUID.fromString(msgIn.getConversationId());
-
-                        senderAgent = msgIn.getSender();
-
-
-                        String content = msgIn.getContent();
-                        myLogger.log(Logger.INFO, "Agent " + getLocalName() + " - Received message: " + content);
-
-                        //IF ACCEPT
+                        //By default accept the proposal
+                        //Set to false if any validation fails
                         boolean acceptProposal = true;
-                        if (acceptProposal) {
-                            ACLMessage accept = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
-                            accept.addReceiver(senderAgent);
-                            accept.setProtocol(LNPaymentProtocol.getProtocolName());
-                            accept.setConversationId(convId.toString());
-                            if (!msgIn.getReplyWith().isEmpty()) {
-                                accept.setInReplyTo(msgIn.getReplyWith());
+
+                        try {
+
+                            //validate the initiation message
+                            if (msgIn.getConversationId().isEmpty()) {
+                                myLogger.log(Logger.WARNING, "Receiver Agent: Initiation message doesn't have a conversation id!");
+                                acceptProposal = false;
+                                //TODO: PALAUTA SYY MIKSI REJECT
+
+                                //state stays as 0
                             }
-                            accept.setReplyWith("accept" + System.currentTimeMillis()); // Unique value
 
-                            accept.setContent("TEST ACCEPT");
+                            Action contentAction = (Action)myAgent.getContentManager().extractContent(msgIn);
+                            AcceptPaymentProposalAndCreateLNInvoice acceptPaymentProposalAndCreateLNInvoice = (AcceptPaymentProposalAndCreateLNInvoice) contentAction.getAction();
 
-                            myLogger.log(Logger.INFO, "MESSAGE: "+accept.toString());
+                            if(!(acceptPaymentProposalAndCreateLNInvoice instanceof AcceptPaymentProposalAndCreateLNInvoice)) {
+                                myLogger.log(Logger.WARNING, "Receiver Agent: Initiation message doesn't have valid content!");
+                                acceptProposal = false;
+                                //TODO: PALAUTA SYY MIKSI REJECT
+                            }
 
-                            myAgent.send(accept);
+                            PaymentProposal paymentProposal = acceptPaymentProposalAndCreateLNInvoice.getPaymentProposal();
 
+                            //Validate:
+                            //-currency
+                            //-product
+                            //-sats value
+                            //-currency value
+
+
+                            convId = UUID.fromString(msgIn.getConversationId());
+                            senderAgent = msgIn.getSender();
                             convBaseTemplate = MessageTemplate.and(
                                     MessageTemplate.MatchProtocol(LNPaymentProtocol.getProtocolName()),
                                     MessageTemplate.MatchConversationId(convId.toString()));
 
-                            state = 1;
-                        } else {
-                            //reject
+                            if (acceptProposal) {
 
-                            //....
-                            myLogger.log(Logger.INFO, "reject");
+
+
+                                ACLMessage accept = initMessage(ACLMessage.ACCEPT_PROPOSAL, msgIn);
+
+                                //Construct agent action and add as content
+                                LNInvoice invoice = new LNInvoice();
+                                invoice.setInvoicestr("test_invoice_string"); //TODO: ADD CORRECT CREATED INVOICE
+                                PaymentProposalAccepted paymentProposalAccepted = new PaymentProposalAccepted();
+                                paymentProposalAccepted.setAccepted(true);
+                                paymentProposalAccepted.setLnInvoice(invoice);
+                                paymentProposalAccepted.setPaymentProposal(paymentProposal);
+
+                                myAgent.getContentManager().fillContent(accept, paymentProposalAccepted);
+
+                                myAgent.send(accept);
+
+                                state = 1;
+                            } else {
+                                //Reject the proposal
+                                //TODO: respond with a formal rejection: why was rejected
+
+                                ACLMessage reject = initMessage(ACLMessage.REJECT_PROPOSAL, msgIn);
+                                PaymentProposalAccepted paymentProposalRejected = new PaymentProposalAccepted();
+                                paymentProposalRejected.setAccepted(false);
+                                paymentProposalRejected.setPaymentProposal(paymentProposal);
+                                //add empty invoice
+                                LNInvoice invoice = new LNInvoice();
+                                invoice.setInvoicestr("");
+                                paymentProposalRejected.setLnInvoice(invoice);
+
+                                myAgent.getContentManager().fillContent(reject, paymentProposalRejected);
+                                myAgent.send(reject);
+                                //state stays 0
+                            }
+
 
                         }
+                        catch (Exception e){
+                            //TODO: ERI VIRHEITÄ ERI EXCEPTIONEIDEN MUKAAN
+                            myLogger.log(Logger.WARNING, "Receiver Agent: Error in state 0;");
+                            e.printStackTrace();
+                        }
+
 
                     } else {
                         block();
@@ -163,6 +212,28 @@ public class TransactionReceiverAgent extends Agent{
 
             //continue
             return false;
+        }
+
+        private ACLMessage initMessage(int performative, ACLMessage replyTo) {
+            //TODO: LISÄÄ ENCODING!? MYÖS TOISEEN AGENTTIIN!
+
+            //Create a new ACLMessage and init with common values
+            ACLMessage msg;
+            if(replyTo != null) {
+                //Is reply: replyTo method creates all boilerplate
+                msg = replyTo.createReply();
+                msg.setPerformative(performative);
+            } else {
+                msg = new ACLMessage(performative);
+                msg.addReceiver(senderAgent);
+                msg.setProtocol(LNPaymentProtocol.getProtocolName());
+                msg.setOntology(LNTxOntology.ONTOLOGY_NAME);
+                msg.setLanguage(FIPANames.ContentLanguage.FIPA_SL0);
+                msg.setConversationId(convId.toString());
+                msg.setReplyWith("msg_"+System.currentTimeMillis()); // Unique value
+            }
+
+            return msg;
         }
 
     }
