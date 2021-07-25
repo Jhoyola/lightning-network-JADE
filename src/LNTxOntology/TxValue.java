@@ -28,7 +28,7 @@ public class TxValue implements Concept {
         this.currencyvalue = currencyvalue;
     }
 
-    public double getSatsvalue() {
+    public int getSatsvalue() {
         return satsvalue;
     }
 

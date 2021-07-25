@@ -95,6 +95,8 @@ public class TransactionReceiverAgent extends Agent{
                         //Set to false if any validation fails
                         boolean acceptProposal = true;
 
+                        //TODO: RAJOITA MONTAKO KERTAA RETRY SAMALTA AGENTILTA
+
                         try {
 
                             //validate the initiation message
@@ -117,10 +119,10 @@ public class TransactionReceiverAgent extends Agent{
 
                             PaymentProposal paymentProposal = acceptPaymentProposalAndCreateLNInvoice.getPaymentProposal();
 
-                            //Validate:
+                            //TODO: Validate:
                             //-currency
                             //-product
-                            //-sats value
+                            //-sats value (hae API:sta)
                             //-currency value
 
 

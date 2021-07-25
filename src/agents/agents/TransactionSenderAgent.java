@@ -1,7 +1,6 @@
 package agents;
 
 import LNTxOntology.*;
-import jade.content.ContentElement;
 import jade.content.lang.sl.SLCodec;
 import jade.content.onto.Ontology;
 import jade.content.onto.basic.Action;
@@ -20,6 +19,8 @@ import jade.util.Logger;
 
 import java.util.UUID;
 import util.LNPaymentProtocol;
+import util.PriceAPICoinGecko;
+import util.PriceAPIWrapper;
 
 
 //The transaction sender agent initiates the conversation
@@ -27,12 +28,16 @@ public class TransactionSenderAgent extends Agent {
 
     private Logger myLogger = Logger.getMyLogger(getClass().getName());
 
+    private PriceAPIWrapper priceApi;
+
     protected void setup() {
 
         // Register the codec for the SL0 language
         getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL0);
         // Register the ontology used by this application
         getContentManager().registerOntology(LNTxOntology.getInstance());
+
+        priceApi = new PriceAPIWrapper(new PriceAPICoinGecko());
 
         //FOR TESTING, INITIATE THE PROTOCOL HERE
         //-----------------------------------------------
@@ -92,8 +97,11 @@ public class TransactionSenderAgent extends Agent {
 
                     //TODO: RAJOITA KUINKA MONTA YRITYSTÄ JOS REJECT
 
-                    //TODO: GET THE CORRECT SATS VALUE
-                    paymentProposal.setSatsvalue(1000); //MOCK VALUE!
+                    double currVal = paymentProposal.getCurrencyvalue();
+                    String currency = paymentProposal.getCurrency();
+
+                    //Get the value converted to satoshis from the API. Cast to int, so satoshis are int value.
+                    paymentProposal.setSatsvalue(priceApi.getSatsValue(currVal,currency));
 
                     //SEND THE INITIATION
                     ACLMessage propose = initMessage(ACLMessage.PROPOSE, null);
@@ -101,12 +109,12 @@ public class TransactionSenderAgent extends Agent {
                     //Construct agent action and add as content
                     AcceptPaymentProposalAndCreateLNInvoice acceptPaymentProposal = new AcceptPaymentProposalAndCreateLNInvoice();
                     acceptPaymentProposal.setPaymentProposal(paymentProposal);
-                    Action a = new Action();
-                    a.setAction(acceptPaymentProposal);
-                    a.setActor(receiverAgent);
+                    Action acceptPaymentProposalAction = new Action();
+                    acceptPaymentProposalAction.setAction(acceptPaymentProposal);
+                    acceptPaymentProposalAction.setActor(receiverAgent);
 
                     try {
-                        myAgent.getContentManager().fillContent(propose, a);
+                        myAgent.getContentManager().fillContent(propose, acceptPaymentProposalAction);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
