@@ -20,6 +20,7 @@ import jade.util.Logger;
 import java.util.UUID;
 import util.LNPaymentProtocol;
 import util.PriceAPICoinGecko;
+import util.PriceAPICoindesk;
 import util.PriceAPIWrapper;
 
 
@@ -240,8 +241,8 @@ public class TransactionSenderAgent extends Agent {
         Agent a;
 
         //TESTING VALUES FOR THE PROTOCOL
-        String currency = "EUR"; //base currency
-        double valCurr = 2.0; //value in base currency
+        String currency = "eur"; //base currency
+        double valCurr = 0.1; //value in base currency
         String prodID = "TEST_PROD"; //product id for the receiver
 
         public StartTransactSendBehaviour(Agent a) {
