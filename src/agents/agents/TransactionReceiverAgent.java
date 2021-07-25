@@ -19,10 +19,19 @@ import jade.util.Logger;
 
 import java.util.UUID;
 import util.LNPaymentProtocol;
+import util.PriceAPICoinGecko;
+import util.PriceAPICoindesk;
+import util.PriceAPIWrapper;
 
 public class TransactionReceiverAgent extends Agent{
 
     private Logger myLogger = Logger.getMyLogger(getClass().getName());
+
+    private PriceAPIWrapper priceApi;
+
+    //TODO: Get price tolerance dynamically from agent arguments
+    //Price tolerance: accepted relative deviation in bitcoin price (0-1)
+    private double priceTolerance = 0.01; // 1 %
 
     protected void setup() {
 
@@ -30,6 +39,9 @@ public class TransactionReceiverAgent extends Agent{
         getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL0);
         // Register the ontology used by this application
         getContentManager().registerOntology(LNTxOntology.getInstance());
+
+        //Use different price api than the sender to simulate realistic situation
+        priceApi = new PriceAPIWrapper(new PriceAPICoindesk());
 
         // Registration with the DF for the initiation
         DFAgentDescription dfd = new DFAgentDescription();
@@ -122,8 +134,21 @@ public class TransactionReceiverAgent extends Agent{
                             //TODO: Validate:
                             //-currency
                             //-product
-                            //-sats value (hae API:sta)
                             //-currency value
+
+                            //validate that the satoshis price matches to the proposed value in traditional currency
+                            int fetchedSatsValue = priceApi.getSatsValue(paymentProposal.getCurrencyvalue(),paymentProposal.getCurrency());
+                            int proposedSatsValue = paymentProposal.getSatsvalue();
+                            double satsValueDeviation = Math.abs(((double)fetchedSatsValue)-((double)proposedSatsValue))/((double)fetchedSatsValue);
+
+                            if(satsValueDeviation > priceTolerance) {
+                                System.out.println("REJECT, TOO BIG VALUE DEVIATION:"); //POISTA TÄMÄ
+                                System.out.println("Deviation: "+satsValueDeviation); //POISTA TÄMÄ
+                                acceptProposal = false;
+                                //TODO: PALAUTA SYY MIKSI REJECT (too bit value deviation)
+                            }
+
+
 
 
                             convId = UUID.fromString(msgIn.getConversationId());
