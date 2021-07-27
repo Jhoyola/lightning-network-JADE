@@ -20,21 +20,23 @@ public class PaymentProposalAccepted implements Predicate {
         return paymentProposal;
     }
 
+    public void setLnInvoice(LNInvoice lnInvoice) {
+        this.lnInvoice = lnInvoice;
+    }
+
     //The invoice is not mandatory as the proposal might be rejected
     @Slot(mandatory = false)
     public LNInvoice getLnInvoice() {
         return lnInvoice;
     }
 
-    public void setLnInvoice(LNInvoice lnInvoice) {
-        this.lnInvoice = lnInvoice;
+    public void setAccepted(boolean accepted) {
+        this.accepted = accepted;
     }
 
     public boolean isAccepted() {
         return accepted;
     }
 
-    public void setAccepted(boolean accepted) {
-        this.accepted = accepted;
-    }
+
 }

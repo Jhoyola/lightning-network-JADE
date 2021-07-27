@@ -1,9 +1,15 @@
 package agents;
 
 import LNTxOntology.*;
+import jade.content.Predicate;
+import jade.content.abs.AbsPredicate;
+import jade.content.lang.Codec;
+import jade.content.lang.sl.SL0Vocabulary;
 import jade.content.lang.sl.SLCodec;
 import jade.content.onto.Ontology;
+import jade.content.onto.OntologyException;
 import jade.content.onto.basic.Action;
+import jade.content.onto.basic.TrueProposition;
 import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.Behaviour;
@@ -138,6 +144,7 @@ public class TransactionSenderAgent extends Agent {
                             PaymentProposalAccepted proposalReply = (PaymentProposalAccepted) myAgent.getContentManager().extractContent(msgIn);
 
                             boolean proposalAccepted = proposalReply.isAccepted();
+                            LNInvoice invoice = proposalReply.getLnInvoice();
 
 
 
@@ -158,10 +165,27 @@ public class TransactionSenderAgent extends Agent {
                                 if (invoiceValidAndPaid) {
                                     //OK
 
-                                    myLogger.log(Logger.INFO, "### INVOICE PAID NOW SEND QUERY-IF ###");
+                                    ACLMessage receivedPaymentQueryMsg = initMessage(ACLMessage.QUERY_IF, msgIn);
+
+                                    ReceivedPaymentQuery invoiceQuery = new ReceivedPaymentQuery();
+                                    invoiceQuery.setLnInvoice(invoice);
+
+                                    Action respondIsPaymentReceivedAction = new Action();
+                                    respondIsPaymentReceivedAction.setAction(invoiceQuery);
+                                    respondIsPaymentReceivedAction.setActor(receiverAgent);
+
+                                    myAgent.getContentManager().fillContent(receivedPaymentQueryMsg, respondIsPaymentReceivedAction);
+
+                                    myAgent.send(receivedPaymentQueryMsg);
 
                                     state = 2;
-                                    //TODO: set new replytemplate
+
+                                    //TODO: TÄSTÄ FUNKTIO??
+                                    replyTemplate =  MessageTemplate.and(convBaseTemplate,
+                                            MessageTemplate.and(
+                                                    MessageTemplate.MatchPerformative(ACLMessage.INFORM),
+                                                    MessageTemplate.MatchInReplyTo(receivedPaymentQueryMsg.getReplyWith())));
+
                                 } else {
                                     state = 4; //FAILED
                                 }
@@ -181,7 +205,39 @@ public class TransactionSenderAgent extends Agent {
                     }
                     break;
                 case 2:
-                    //myLogger.log(Logger.INFO, "Sender state 2");
+                    if (msgIn != null) {
+
+                        try {
+                            //TEST
+
+                            //Prepositions are compared using class
+                            Class informClass = myAgent.getContentManager().extractContent(msgIn).getClass();
+                            Class trueClass = (new TrueProposition()).getClass();
+
+                            /*
+                            System.out.println("test, msg in:");
+                            System.out.println(inform.getClass());
+                            System.out.println(inform.toString());
+                            System.out.println("true pred:");
+                            System.out.println(trueProposition.getClass());
+                            System.out.println(trueProposition.toString());
+                            */
+
+
+                            if(informClass.equals(trueClass)) {
+                                //TODO:HANDLE
+                                myLogger.log(Logger.INFO, "RECEIVED INFORM TRUE");
+                            } else {
+                                //TODO:HANDLE
+                                myLogger.log(Logger.WARNING, "RECEIVED INFORM FALSE");
+                            }
+
+                        } catch (Codec.CodecException e) {
+                            e.printStackTrace();
+                        } catch (OntologyException e) {
+                            e.printStackTrace();
+                        }
+                    }
                     break;
                 case 3:
                     //myLogger.log(Logger.INFO, "Sender state 3");
@@ -203,7 +259,7 @@ public class TransactionSenderAgent extends Agent {
                 return true;
             }
             if (state == 3) {
-                myLogger.log(Logger.WARNING, "Transaction completed successfully.");
+                myLogger.log(Logger.INFO, "Transaction sender: Transaction completed successfully.");
                 return true;
             }
 
@@ -227,7 +283,7 @@ public class TransactionSenderAgent extends Agent {
                 msg.setOntology(LNTxOntology.ONTOLOGY_NAME);
                 msg.setLanguage(FIPANames.ContentLanguage.FIPA_SL0);
                 msg.setConversationId(convId.toString());
-                msg.setReplyWith("msg_"+System.currentTimeMillis()); // Unique value
+                msg.setReplyWith("Init_ln_tx_protocol_"+System.currentTimeMillis()); // Unique value
             }
 
             return msg;

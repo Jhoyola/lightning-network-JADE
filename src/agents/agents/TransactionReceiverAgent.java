@@ -4,7 +4,11 @@ import LNTxOntology.*;
 import jade.content.AgentAction;
 import jade.content.ContentElement;
 import jade.content.Predicate;
+import jade.content.abs.AbsPredicate;
+import jade.content.lang.Codec;
+import jade.content.lang.sl.SL0Vocabulary;
 import jade.content.lang.sl.SLCodec;
+import jade.content.onto.OntologyException;
 import jade.content.onto.basic.Action;
 import jade.core.*;
 import jade.core.behaviours.*;
@@ -15,6 +19,7 @@ import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.DFService;
 import jade.domain.FIPAException;
 import jade.lang.acl.MessageTemplate;
+import jade.tools.DummyAgent.DummyAgent;
 import jade.util.Logger;
 
 import java.util.UUID;
@@ -175,7 +180,12 @@ public class TransactionReceiverAgent extends Agent{
 
                                 myAgent.send(accept);
 
-                                state = 1;
+                                replyTemplate =  MessageTemplate.and(convBaseTemplate,
+                                        MessageTemplate.and(
+                                                MessageTemplate.MatchPerformative(ACLMessage.QUERY_IF),
+                                                MessageTemplate.MatchInReplyTo(accept.getReplyWith())));
+
+                                state = 2;
                             } else {
                                 //Reject the proposal
                                 //TODO: respond with a formal rejection: why was rejected
@@ -191,7 +201,8 @@ public class TransactionReceiverAgent extends Agent{
 
                                 myAgent.getContentManager().fillContent(reject, paymentProposalRejected);
                                 myAgent.send(reject);
-                                //state stays 0
+                                //TODO: state stays 0 ??? VAI 1??
+                                //reply template stays the same, or add reply with??
                             }
 
 
@@ -209,19 +220,46 @@ public class TransactionReceiverAgent extends Agent{
 
                     break;
                 case 1:
-                    //myLogger.log(Logger.INFO, "Receiver state 1");
+                    if (msgIn != null) {
+                        //TODO: TÄMÄ ON OIKEASTAAN SAMA KUN CASE 0!?
+                        //myLogger.log(Logger.INFO, "Receiver state 1");
+                    }
                     break;
                 case 2:
-                    //myLogger.log(Logger.INFO, "Receiver state 2");
+                    //proposal accepted. should receive query-if: is payment received
+                    if (msgIn != null) {
+                        try {
+
+                            //TODO: CHECK THAT PAYMENT IS RECEIVED
+
+                            boolean paymentReceived = true;
+                            if (paymentReceived) {
+                                Predicate responseTrue = new AbsPredicate(SL0Vocabulary.TRUE_PROPOSITION);
+                                ACLMessage informTrue = initMessage(ACLMessage.INFORM, msgIn);
+                                myAgent.getContentManager().fillContent(informTrue, responseTrue);
+
+                                myAgent.send(informTrue);
+                                state = 4;
+
+                            } else {
+                                //TODO: FAILURE
+                            }
+
+                        } catch (Codec.CodecException e) {
+                            e.printStackTrace();
+                        } catch (OntologyException e) {
+                            e.printStackTrace();
+                        }
+
+
+                        //myLogger.log(Logger.INFO, "Receiver state 2");
+                    }
                     break;
                 case 3:
-                    //myLogger.log(Logger.INFO, "Receiver state 3");
+                    if (msgIn != null) {
+                        //myLogger.log(Logger.INFO, "Receiver state 3");
+                    }
                     break;
-                case 4:
-                    //myLogger.log(Logger.INFO, "Receiver state 4");
-                    break;
-
-
             }
         }
 
@@ -233,7 +271,7 @@ public class TransactionReceiverAgent extends Agent{
                 return true;
             }
             if (state == 4) {
-                myLogger.log(Logger.WARNING, "Transaction completed successfully.");
+                myLogger.log(Logger.INFO, "Transaction receiver: Transaction completed successfully.");
                 return true;
             }
 
