@@ -33,6 +33,14 @@ import util.PriceAPIWrapper;
 //The transaction sender agent initiates the conversation
 public class TransactionSenderAgent extends Agent {
 
+    private enum State {
+        INITIAL,    // 1
+        PROPOSED,   // 2
+        PAID,       // 3
+        SUCCESS,    // 4
+        FAILURE
+    };
+
     private Logger myLogger = Logger.getMyLogger(getClass().getName());
 
     private PriceAPIWrapper priceApi;
@@ -60,12 +68,7 @@ public class TransactionSenderAgent extends Agent {
         private PaymentProposal paymentProposal;
 
         //State of the protocol. Internal to this agent, does not correspond to the state of the counterparty.
-        //0 = Not initiated
-        //1 = Waiting for response to proposal
-        //2 = Invoice paid
-        //3 = Successfully finished
-        //4 = Failure
-        private int state;
+        private State state = State.INITIAL;
 
         private UUID convId;
 
@@ -86,7 +89,6 @@ public class TransactionSenderAgent extends Agent {
             paymentProposal.setProdid(prodID);
             paymentProposal.setCurrencyvalue(valCurr);
 
-            this.state = 0;
             this.convId = UUID.randomUUID(); //set the conversation id
             this.convBaseTemplate = MessageTemplate.and(
                     MessageTemplate.MatchProtocol(LNPaymentProtocol.getProtocolName()),
@@ -100,7 +102,7 @@ public class TransactionSenderAgent extends Agent {
             ACLMessage msgIn = myAgent.receive(replyTemplate);
 
             switch (state) {
-                case 0:
+                case INITIAL:
 
                     //TODO: RAJOITA KUINKA MONTA YRITYSTÄ JOS REJECT
 
@@ -134,9 +136,9 @@ public class TransactionSenderAgent extends Agent {
                                 MessageTemplate.or(MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL), MessageTemplate.MatchPerformative(ACLMessage.REJECT_PROPOSAL)),
                                 MessageTemplate.MatchInReplyTo(propose.getReplyWith())));
 
-                    state = 1;
+                    state = State.PROPOSED;
                     break;
-                case 1:
+                case PROPOSED:
                     if(msgIn != null){
 
 
@@ -178,7 +180,7 @@ public class TransactionSenderAgent extends Agent {
 
                                     myAgent.send(receivedPaymentQueryMsg);
 
-                                    state = 2;
+                                    state = State.PAID;
 
                                     //TODO: TÄSTÄ FUNKTIO??
                                     replyTemplate =  MessageTemplate.and(convBaseTemplate,
@@ -187,24 +189,24 @@ public class TransactionSenderAgent extends Agent {
                                                     MessageTemplate.MatchInReplyTo(receivedPaymentQueryMsg.getReplyWith())));
 
                                 } else {
-                                    state = 4; //FAILED
+                                    state = State.FAILURE; //FAILED
                                 }
 
                             } else {
                                 //proposal rejected, naively retry
-                                state = 0;
+                                state = State.INITIAL;
                             }
                         }catch (Exception e) {
                             myLogger.log(Logger.WARNING, "Sender Agent: Error in receiving response to proposal.");
                             e.printStackTrace();
-                            state = 4; //FAILED
+                            state = State.FAILURE; //FAILED
                         }
 
                     }else{
                         block();
                     }
                     break;
-                case 2:
+                case PAID:
                     if (msgIn != null) {
 
                         try {
@@ -227,9 +229,11 @@ public class TransactionSenderAgent extends Agent {
                             if(informClass.equals(trueClass)) {
                                 //TODO:HANDLE
                                 myLogger.log(Logger.INFO, "RECEIVED INFORM TRUE");
+                                state = State.SUCCESS;
                             } else {
                                 //TODO:HANDLE
                                 myLogger.log(Logger.WARNING, "RECEIVED INFORM FALSE");
+                                state = State.FAILURE;
                             }
 
                         } catch (Codec.CodecException e) {
@@ -239,13 +243,6 @@ public class TransactionSenderAgent extends Agent {
                         }
                     }
                     break;
-                case 3:
-                    //myLogger.log(Logger.INFO, "Sender state 3");
-                    break;
-                case 4:
-                    //myLogger.log(Logger.INFO, "Sender state 4");
-                    //TODO:SEND FAILURE
-                    break;
 
             }
 
@@ -254,11 +251,11 @@ public class TransactionSenderAgent extends Agent {
         public boolean done() {
 
             //end
-            if (state == 4) {
+            if (state == State.FAILURE) {
                 myLogger.log(Logger.WARNING, "Transaction failed.");
                 return true;
             }
-            if (state == 3) {
+            if (state == State.SUCCESS) {
                 myLogger.log(Logger.INFO, "Transaction sender: Transaction completed successfully.");
                 return true;
             }
