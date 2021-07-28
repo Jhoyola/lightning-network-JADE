@@ -72,34 +72,29 @@ public class TransactionReceiverAgent extends Agent{
         }
     }
 
+
     private class TransactReceiveBehaviour extends Behaviour {
 
-        private AID senderAgent; //sender
+        //The counterparty agent
+        private AID senderAgent;
+        //State of the protocol. Internal to this agent, does not correspond to the state of the counterparty.
+        private State state = State.INITIAL;
+        //Conversation id
+        private UUID convId;
+        //template for replies, updated on every state
+        private MessageTemplate replyTemplate;
 
+        //TODO: JOS NÄITÄ KÄYTETÄÄN NIIN LISÄÄ INIT FUNKTIOON!
         private String currency; //base currency
         private double valCurr; //value in base currency
         private int valSats; //value in satoshis
         private String prodID; //product id of the transaction
 
-        //State of the protocol. Internal to this agent, does not correspond to the state of the counterparty.
-        private State state = State.INITIAL;
 
-        private UUID convId;
-
-        //template for replies, updated on every state
-        private MessageTemplate replyTemplate;
-
-        //template with convId and protocol
-        private MessageTemplate convBaseTemplate;
 
         public TransactReceiveBehaviour(Agent a) {
             super(a);
-
-            //first template: performative and protocol
-            this.replyTemplate = MessageTemplate.and(
-                    MessageTemplate.MatchPerformative(ACLMessage.PROPOSE),
-                    MessageTemplate.MatchProtocol(LNPaymentProtocol.getProtocolName()));
-
+            initializeBehaviour();
         }
 
         public void action() {
@@ -159,15 +154,12 @@ public class TransactionReceiverAgent extends Agent{
 
                             convId = UUID.fromString(msgIn.getConversationId());
                             senderAgent = msgIn.getSender();
-                            convBaseTemplate = MessageTemplate.and(
-                                    MessageTemplate.MatchProtocol(LNPaymentProtocol.getProtocolName()),
-                                    MessageTemplate.MatchConversationId(convId.toString()));
 
                             if (acceptProposal) {
 
-
-
-                                ACLMessage accept = initMessage(ACLMessage.ACCEPT_PROPOSAL, msgIn);
+                                //create reply
+                                ACLMessage accept = msgIn.createReply();
+                                accept.setPerformative(ACLMessage.ACCEPT_PROPOSAL);
 
                                 //Construct agent action and add as content
                                 LNInvoice invoice = new LNInvoice();
@@ -181,17 +173,16 @@ public class TransactionReceiverAgent extends Agent{
 
                                 myAgent.send(accept);
 
-                                replyTemplate =  MessageTemplate.and(convBaseTemplate,
-                                        MessageTemplate.and(
-                                                MessageTemplate.MatchPerformative(ACLMessage.QUERY_IF),
-                                                MessageTemplate.MatchInReplyTo(accept.getReplyWith())));
+                                setMessageTemplate(new int[]{ACLMessage.QUERY_IF, ACLMessage.FAILURE}, accept.getReplyWith());
 
                                 state = State.PROPOSAL_ACCEPTED;
                             } else {
                                 //Reject the proposal
                                 //TODO: respond with a formal rejection: why was rejected
 
-                                ACLMessage reject = initMessage(ACLMessage.REJECT_PROPOSAL, msgIn);
+                                ACLMessage reject = msgIn.createReply();
+                                reject.setPerformative(ACLMessage.REJECT_PROPOSAL);
+
                                 PaymentProposalAccepted paymentProposalRejected = new PaymentProposalAccepted();
                                 paymentProposalRejected.setAccepted(false);
                                 paymentProposalRejected.setPaymentProposal(paymentProposal);
@@ -233,8 +224,12 @@ public class TransactionReceiverAgent extends Agent{
 
                             boolean paymentReceived = true;
                             if (paymentReceived) {
+
+                                //reply true
+                                ACLMessage informTrue = msgIn.createReply();
+                                informTrue.setPerformative(ACLMessage.INFORM);
+
                                 Predicate responseTrue = new AbsPredicate(SL0Vocabulary.TRUE_PROPOSITION);
-                                ACLMessage informTrue = initMessage(ACLMessage.INFORM, msgIn);
                                 myAgent.getContentManager().fillContent(informTrue, responseTrue);
 
                                 myAgent.send(informTrue);
@@ -259,40 +254,64 @@ public class TransactionReceiverAgent extends Agent{
 
         public boolean done() {
 
-            //end
             if (state == State.FAILURE) {
                 myLogger.log(Logger.WARNING, "Transaction failed.");
-                return true;
+
+                //never finish receiving action
+                //return true;
+
+                //if finish, then init the state
+                initializeBehaviour();
             }
+
             if (state == State.SUCCESS) {
                 myLogger.log(Logger.INFO, "Transaction receiver: Transaction completed successfully.");
-                return true;
+
+                //never finish receiving action
+                //return true;
+
+                //if finish, then init the state
+                initializeBehaviour();
             }
 
             //continue
             return false;
         }
 
-        private ACLMessage initMessage(int performative, ACLMessage replyTo) {
-            //TODO: LISÄÄ ENCODING!? MYÖS TOISEEN AGENTTIIN!
+        private void initializeBehaviour () {
+            convId = null;
+            senderAgent = null;
+            state = State.INITIAL;
+            setMessageTemplate(new int[]{ACLMessage.PROPOSE}, "");
+        }
 
-            //Create a new ACLMessage and init with common values
-            ACLMessage msg;
-            if(replyTo != null) {
-                //Is reply: replyTo method creates all boilerplate
-                msg = replyTo.createReply();
-                msg.setPerformative(performative);
-            } else {
-                msg = new ACLMessage(performative);
-                msg.addReceiver(senderAgent);
-                msg.setProtocol(LNPaymentProtocol.getProtocolName());
-                msg.setOntology(LNTxOntology.ONTOLOGY_NAME);
-                msg.setLanguage(FIPANames.ContentLanguage.FIPA_SL0);
-                msg.setConversationId(convId.toString());
-                msg.setReplyWith("msg_"+System.currentTimeMillis()); // Unique value
+        private void setMessageTemplate(int[] acceptedPerformatives, String inReplyTo) {
+
+            //always add protocol to the template
+            MessageTemplate template = MessageTemplate.MatchProtocol(LNPaymentProtocol.getProtocolName());
+
+            //add conversation id if exists
+            if (this.convId != null && this.convId.toString() != "") {
+                template = MessageTemplate.and(template, MessageTemplate.MatchConversationId(this.convId.toString()));
             }
 
-            return msg;
+            //add 'in reply to' if given
+            if(!inReplyTo.isEmpty()) {
+                template = MessageTemplate.and(template, MessageTemplate.MatchInReplyTo(inReplyTo));
+            }
+
+            //add performatives if any
+            if (acceptedPerformatives.length > 0) {
+                //add the first performative
+                MessageTemplate performativesTemplate = MessageTemplate.MatchPerformative(acceptedPerformatives[0]);
+                //add other performatives if exist
+                for (int i = 1; i < acceptedPerformatives.length; i++) {
+                    performativesTemplate = MessageTemplate.or(performativesTemplate, MessageTemplate.MatchPerformative(acceptedPerformatives[i]));
+                }
+                template = MessageTemplate.and(template, performativesTemplate);
+            }
+
+            this.replyTemplate = template;
         }
 
     }
