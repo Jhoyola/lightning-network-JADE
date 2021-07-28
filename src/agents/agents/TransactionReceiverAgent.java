@@ -211,14 +211,23 @@ public class TransactionReceiverAgent extends Agent{
 
                     break;
                 case PROPOSAL_REJECTED:
+                    //TODO: MITEN TÄMÄ?
                     //REJECTED GO BACK TO INITIAL ??
                     state = State.INITIAL;
-
                     break;
+
                 case PROPOSAL_ACCEPTED:
                     //proposal accepted. should receive query-if: is payment received
                     if (msgIn != null) {
                         try {
+
+                            //Counterparty couldn't make the payment
+                            if(msgIn.getPerformative() == ACLMessage.FAILURE) {
+                                //failure: payment is not paid
+                                //TODO: FAILURE
+                                state = State.FAILURE;
+                                break; //quit the action
+                            }
 
                             //TODO: CHECK THAT PAYMENT IS RECEIVED
 

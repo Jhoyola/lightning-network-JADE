@@ -14,6 +14,7 @@ import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.Behaviour;
 import jade.core.behaviours.OneShotBehaviour;
+import jade.core.behaviours.TickerBehaviour;
 import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
@@ -58,6 +59,7 @@ public class TransactionSenderAgent extends Agent {
         //-----------------------------------------------
         addBehaviour(new StartTransactSendBehaviour(this));
         //-----------------------------------------------
+
     }
 
 
@@ -184,7 +186,11 @@ public class TransactionSenderAgent extends Agent {
                                     setMessageTemplate(new int[]{ACLMessage.INFORM}, receivedPaymentQueryMsg.getReplyWith());
 
                                 } else {
-                                    state = State.FAILURE; //FAILED
+                                    //reply failure
+                                    state = State.FAILURE;
+                                    ACLMessage failureMsg = msgIn.createReply();
+                                    failureMsg.setPerformative(ACLMessage.FAILURE);
+                                    myAgent.send(failureMsg);
                                 }
 
                             } else {
@@ -307,38 +313,34 @@ public class TransactionSenderAgent extends Agent {
 
         public void action() {
 
-            //SLEEP TO MAKE SURE THAT THE RECEIVER AGENT IS CREATED
-            try
-            {
-                Thread.sleep(10000);
-            }
-            catch(InterruptedException ex)
-            {
-                Thread.currentThread().interrupt();
-            }
+            //ticker behaviour to make multiple payments
+            addBehaviour(new TickerBehaviour(a, 10000) {
+                protected void onTick() {
+                    myLogger.log(Logger.INFO, "Start finding receivers");
 
-            myLogger.log(Logger.INFO, "Start finding receivers");
+                    //Find receivers
+                    DFAgentDescription template = new DFAgentDescription();
+                    ServiceDescription sd = new ServiceDescription();
+                    sd.setType("receive-ln-tx");
+                    template.addServices(sd);
 
-            //Find receivers
-            DFAgentDescription template = new DFAgentDescription();
-            ServiceDescription sd = new ServiceDescription();
-            sd.setType("receive-ln-tx");
-            template.addServices(sd);
+                    try {
+                        DFAgentDescription[] result = DFService.search(myAgent, template);
 
-            try {
-                DFAgentDescription[] result = DFService.search(myAgent, template);
-
-                if(result.length > 0) {
-                    myLogger.log(Logger.INFO, "Found a receiver, starting TransactSendBehaviour");
-                    AID receiver = result[0].getName();
-                    addBehaviour(new TransactSendBehaviour(a, receiver, currency, valCurr, prodID));
-                } else {
-                    myLogger.log(Logger.INFO, "Didn't find a receiver");
+                        if(result.length > 0) {
+                            myLogger.log(Logger.INFO, "Found a receiver, starting TransactSendBehaviour");
+                            AID receiver = result[0].getName();
+                            addBehaviour(new TransactSendBehaviour(a, receiver, currency, valCurr, prodID));
+                        } else {
+                            myLogger.log(Logger.INFO, "Didn't find a receiver");
+                        }
+                    }
+                    catch (FIPAException fe) {
+                        fe.printStackTrace();
+                    }
                 }
-            }
-            catch (FIPAException fe) {
-                fe.printStackTrace();
-            }
+            } );
+
         }
     }
 }
