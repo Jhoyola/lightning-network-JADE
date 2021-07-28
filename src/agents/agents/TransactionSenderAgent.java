@@ -24,11 +24,10 @@ import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.util.Logger;
 
+import java.util.ArrayList;
 import java.util.UUID;
-import util.LNPaymentProtocol;
-import util.PriceAPICoinGecko;
-import util.PriceAPICoindesk;
-import util.PriceAPIWrapper;
+
+import util.*;
 
 
 //The transaction sender agent initiates the conversation
@@ -312,6 +311,40 @@ public class TransactionSenderAgent extends Agent {
         }
 
         public void action() {
+
+            //TEST PRODUCTPRICES
+            //----------------------------
+            ProductCatalog catalog = new ProductCatalog();
+
+            ListedProduct p = new ListedProduct("prod_id_1");
+            p.addPrice(1, "eur");
+            p.addPrice(0.9, "usd");
+            catalog.addProduct(p);
+            p = new ListedProduct("prod_id_2");
+            p.addPrice(2, "eur");
+            p.addPrice(2, "usd");
+            catalog.addProduct(p);
+            //try adding again the same prod
+            p = new ListedProduct("prod_id_1");
+            p.addPrice(5, "eur");
+            p.addPrice(6, "usd");
+            catalog.addProduct(p);
+            
+
+            System.out.println("true: "+catalog.hasProductWithPrice("prod_id_1",1,"eur"));
+            System.out.println("true: "+catalog.hasProductWithPrice("prod_id_2",2,"usd"));
+            System.out.println("true: "+catalog.hasProductWithPrice("prod_id_1",5,"eur"));
+            System.out.println("false: "+catalog.hasProductWithPrice("prod_id_1",20,"eur"));
+            System.out.println("false: "+catalog.hasProductWithPrice("prod_id_3",1,"eur"));
+            System.out.println("false: "+catalog.hasProductWithPrice("prod_id_3",2,"eur"));
+            System.out.println("false: "+catalog.hasProductWithPrice("prod_id_2",1,"eur"));
+            System.out.println("false: "+catalog.hasProductWithPrice("prod_id_2",2,"xxx"));
+
+
+            //----------------------------
+
+
+
 
             //ticker behaviour to make multiple payments
             addBehaviour(new TickerBehaviour(a, 10000) {
