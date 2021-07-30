@@ -23,30 +23,41 @@ import jade.tools.DummyAgent.DummyAgent;
 import jade.util.Logger;
 
 import java.util.UUID;
-import util.LNPaymentProtocol;
-import util.PriceAPICoinGecko;
-import util.PriceAPICoindesk;
-import util.PriceAPIWrapper;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Handler;
+
+import util.*;
 
 public class TransactionReceiverAgent extends Agent{
 
     private enum State {
         INITIAL,            // 1
-        PROPOSAL_REJECTED,
         PROPOSAL_ACCEPTED,  // 2
         SUCCESS,            // 3
         FAILURE
     };
 
-    private Logger myLogger = Logger.getMyLogger(getClass().getName());
+    private Logger myLogger = Logger.getJADELogger(getClass().getName());
 
     private PriceAPIWrapper priceApi;
+
+    private ProductCatalog productCatalog;
 
     //TODO: Get price tolerance dynamically from agent arguments
     //Price tolerance: accepted relative deviation in bitcoin price (0-1)
     private double priceTolerance = 0.01; // 1 %
 
     protected void setup() {
+
+        //set logging level
+        boolean debug = true;
+        if (debug) {
+            //debug logging
+            myLogger.setLevel(Logger.FINE);
+        } else {
+            //normal logging
+            myLogger.setLevel(Logger.INFO);
+        }
 
         // Register the codec for the SL0 language
         getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL0);
@@ -55,6 +66,19 @@ public class TransactionReceiverAgent extends Agent{
 
         //Use different price api than the sender to simulate realistic situation
         priceApi = new PriceAPIWrapper(new PriceAPICoindesk());
+
+        productCatalog = new ProductCatalog();
+
+        ListedProduct p = new ListedProduct("prod_1");
+        p.addPrice(0.2, "eur");
+        p.addPrice(0.22, "usd");
+        productCatalog.addProduct(p);
+
+        p = new ListedProduct("prod_2");
+        p.addPrice(0.6, "eur");
+        p.addPrice(0.7, "eur");
+        p.addPrice(0.8, "eur");
+        productCatalog.addProduct(p);
 
         // Registration with the DF for the initiation
         DFAgentDescription dfd = new DFAgentDescription();
@@ -72,7 +96,6 @@ public class TransactionReceiverAgent extends Agent{
         }
     }
 
-
     private class TransactReceiveBehaviour extends Behaviour {
 
         //The counterparty agent
@@ -84,16 +107,12 @@ public class TransactionReceiverAgent extends Agent{
         //template for replies, updated on every state
         private MessageTemplate replyTemplate;
 
-        //TODO: JOS NÄITÄ KÄYTETÄÄN NIIN LISÄÄ INIT FUNKTIOON!
-        private String currency; //base currency
-        private double valCurr; //value in base currency
-        private int valSats; //value in satoshis
-        private String prodID; //product id of the transaction
-
+        private PaymentProposal receivedPaymentProposal;
 
 
         public TransactReceiveBehaviour(Agent a) {
             super(a);
+            myLogger.log(Logger.FINE, "Starting TransactReceiveBehaviour");
             initializeBehaviour();
         }
 
@@ -117,8 +136,6 @@ public class TransactionReceiverAgent extends Agent{
                                 myLogger.log(Logger.WARNING, "Receiver Agent: Initiation message doesn't have a conversation id!");
                                 acceptProposal = false;
                                 //TODO: PALAUTA SYY MIKSI REJECT
-
-                                state = State.PROPOSAL_REJECTED;
                             }
 
                             Action contentAction = (Action)myAgent.getContentManager().extractContent(msgIn);
@@ -130,78 +147,74 @@ public class TransactionReceiverAgent extends Agent{
                                 //TODO: PALAUTA SYY MIKSI REJECT
                             }
 
-                            PaymentProposal paymentProposal = acceptPaymentProposalAndCreateLNInvoice.getPaymentProposal();
+                            PaymentProposal receivedPaymentProposal = acceptPaymentProposalAndCreateLNInvoice.getPaymentProposal();
 
-                            //TODO: Validate:
-                            //-currency
-                            //-product
-                            //-currency value
-
-                            //validate that the satoshis price matches to the proposed value in traditional currency
-                            int fetchedSatsValue = priceApi.getSatsValue(paymentProposal.getCurrencyvalue(),paymentProposal.getCurrency());
-                            int proposedSatsValue = paymentProposal.getSatsvalue();
-                            double satsValueDeviation = Math.abs(((double)fetchedSatsValue)-((double)proposedSatsValue))/((double)fetchedSatsValue);
-
-                            if(satsValueDeviation > priceTolerance) {
-                                System.out.println("REJECT, TOO BIG VALUE DEVIATION:"); //POISTA TÄMÄ
-                                System.out.println("Deviation: "+satsValueDeviation); //POISTA TÄMÄ
+                            //validate that the product is allowed
+                            if (!productCatalog.hasProductWithPrice(receivedPaymentProposal.getProdid(),receivedPaymentProposal.getCurrencyvalue(),receivedPaymentProposal.getCurrency())) {
+                                myLogger.log(Logger.WARNING, "Receiver Agent: Product or price not accepted!");
                                 acceptProposal = false;
-                                //TODO: PALAUTA SYY MIKSI REJECT (too bit value deviation)
+                                //TODO: PALAUTA SYY MIKSI REJECT
                             }
 
+                            //validate that the satoshis price matches to the proposed value in traditional currency
+                            int fetchedSatsValue = priceApi.getSatsValue(receivedPaymentProposal.getCurrencyvalue(),receivedPaymentProposal.getCurrency());
+                            int proposedSatsValue = receivedPaymentProposal.getSatsvalue();
+                            double satsValueDeviation = Math.abs(((double)fetchedSatsValue)-((double)proposedSatsValue))/((double)fetchedSatsValue);
 
+                            myLogger.log(Logger.FINE,
+                                    "Payment proposal: satoshis value: "+ proposedSatsValue +
+                                            ", fetched satoshis value: "+ fetchedSatsValue +
+                                            ", relative difference: "+ satsValueDeviation);
 
-
-                            convId = UUID.fromString(msgIn.getConversationId());
-                            senderAgent = msgIn.getSender();
+                            if(satsValueDeviation > priceTolerance) {
+                                myLogger.log(Logger.WARNING, "Receiver Agent: Satoshi values don't match, deviation: "+satsValueDeviation);
+                                acceptProposal = false;
+                                //TODO: PALAUTA SYY MIKSI REJECT (too big value deviation)
+                            }
 
                             if (acceptProposal) {
+
+                                convId = UUID.fromString(msgIn.getConversationId());
+                                senderAgent = msgIn.getSender();
 
                                 //create reply
                                 ACLMessage accept = msgIn.createReply();
                                 accept.setPerformative(ACLMessage.ACCEPT_PROPOSAL);
 
+                                //TODO: CREATE INVOICE
+                                //create the invoice and add message to the invoice (conv id, payment proposal)
+
+                                //TODO
+                                //TODO
+                                //TODO
+                                String invoiceStr = "test_invoice_string";
+
+
                                 //Construct agent action and add as content
                                 LNInvoice invoice = new LNInvoice();
-                                invoice.setInvoicestr("test_invoice_string"); //TODO: ADD CORRECT CREATED INVOICE
+                                invoice.setInvoicestr(invoiceStr);
                                 PaymentProposalAccepted paymentProposalAccepted = new PaymentProposalAccepted();
                                 paymentProposalAccepted.setAccepted(true);
                                 paymentProposalAccepted.setLnInvoice(invoice);
-                                paymentProposalAccepted.setPaymentProposal(paymentProposal);
+                                paymentProposalAccepted.setPaymentProposal(receivedPaymentProposal);
 
                                 myAgent.getContentManager().fillContent(accept, paymentProposalAccepted);
 
                                 myAgent.send(accept);
 
                                 setMessageTemplate(new int[]{ACLMessage.QUERY_IF, ACLMessage.FAILURE}, accept.getReplyWith());
-
                                 state = State.PROPOSAL_ACCEPTED;
                             } else {
-                                //Reject the proposal
-                                //TODO: respond with a formal rejection: why was rejected
-
-                                ACLMessage reject = msgIn.createReply();
-                                reject.setPerformative(ACLMessage.REJECT_PROPOSAL);
-
-                                PaymentProposalAccepted paymentProposalRejected = new PaymentProposalAccepted();
-                                paymentProposalRejected.setAccepted(false);
-                                paymentProposalRejected.setPaymentProposal(paymentProposal);
-                                //add empty invoice
-                                LNInvoice invoice = new LNInvoice();
-                                invoice.setInvoicestr("");
-                                paymentProposalRejected.setLnInvoice(invoice);
-
-                                myAgent.getContentManager().fillContent(reject, paymentProposalRejected);
-                                myAgent.send(reject);
-                                state = State.PROPOSAL_REJECTED;
+                                sendRejectionOfProposal(msgIn, "TODO TÄHÄN REJECT VIESTI");
                             }
-
 
                         }
                         catch (Exception e){
                             //TODO: ERI VIRHEITÄ ERI EXCEPTIONEIDEN MUKAAN
-                            myLogger.log(Logger.WARNING, "Receiver Agent: Error in state 0;");
+                            myLogger.log(Logger.WARNING, "Rejected proposal because of exception.");
+                            sendRejectionOfProposal(msgIn, "TODO TÄHÄN REJECT VIESTI");
                             e.printStackTrace();
+                            initializeBehaviour();
                         }
 
 
@@ -209,11 +222,6 @@ public class TransactionReceiverAgent extends Agent{
                         block();
                     }
 
-                    break;
-                case PROPOSAL_REJECTED:
-                    //TODO: MITEN TÄMÄ?
-                    //REJECTED GO BACK TO INITIAL ??
-                    state = State.INITIAL;
                     break;
 
                 case PROPOSAL_ACCEPTED:
@@ -243,6 +251,7 @@ public class TransactionReceiverAgent extends Agent{
 
                                 myAgent.send(informTrue);
                                 state = State.SUCCESS;
+                                myLogger.log(Logger.INFO, "SUCCESS, PAYMENT RECEIVED");
 
                             } else {
                                 //TODO: FAILURE
@@ -274,8 +283,6 @@ public class TransactionReceiverAgent extends Agent{
             }
 
             if (state == State.SUCCESS) {
-                myLogger.log(Logger.INFO, "Transaction receiver: Transaction completed successfully.");
-
                 //never finish receiving action
                 //return true;
 
@@ -287,10 +294,38 @@ public class TransactionReceiverAgent extends Agent{
             return false;
         }
 
+        private void sendRejectionOfProposal (ACLMessage msgIn, String reason) {
+            //Reject the proposal
+            //TODO: respond with a formal rejection: why was rejected
+
+            ACLMessage reject = msgIn.createReply();
+            reject.setPerformative(ACLMessage.REJECT_PROPOSAL);
+
+            PaymentProposalAccepted paymentProposalRejected = new PaymentProposalAccepted();
+            paymentProposalRejected.setAccepted(false);
+            paymentProposalRejected.setPaymentProposal(receivedPaymentProposal);
+            //add empty invoice
+            LNInvoice invoice = new LNInvoice();
+            invoice.setInvoicestr("");
+            paymentProposalRejected.setLnInvoice(invoice);
+
+            try {
+                myAgent.getContentManager().fillContent(reject, paymentProposalRejected);
+                myAgent.send(reject);
+            } catch (Codec.CodecException e) {
+                e.printStackTrace();
+            } catch (OntologyException e) {
+                e.printStackTrace();
+            }
+
+            //state stays initial
+        }
+
         private void initializeBehaviour () {
             convId = null;
             senderAgent = null;
             state = State.INITIAL;
+            receivedPaymentProposal = null;
             setMessageTemplate(new int[]{ACLMessage.PROPOSE}, "");
         }
 

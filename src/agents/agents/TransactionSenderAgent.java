@@ -26,6 +26,8 @@ import jade.util.Logger;
 
 import java.util.ArrayList;
 import java.util.UUID;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Handler;
 
 import util.*;
 
@@ -41,11 +43,21 @@ public class TransactionSenderAgent extends Agent {
         FAILURE
     };
 
-    private Logger myLogger = Logger.getMyLogger(getClass().getName());
+    private Logger myLogger = Logger.getJADELogger(getClass().getName());
 
     private PriceAPIWrapper priceApi;
 
     protected void setup() {
+
+        //set logging level
+        boolean debug = true;
+        if (debug) {
+            //debug logging
+            myLogger.setLevel(Logger.FINE);
+        } else {
+            //normal logging
+            myLogger.setLevel(Logger.INFO);
+        }
 
         // Register the codec for the SL0 language
         getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL0);
@@ -71,6 +83,11 @@ public class TransactionSenderAgent extends Agent {
         //conversation id
         private UUID convId;
 
+        //maximum amount of propositions to do
+        private int maxRetries;
+        //retries used
+        private int retries = 0;
+
         private PaymentProposal paymentProposal;
 
         //template for replies, updated on every state
@@ -80,7 +97,11 @@ public class TransactionSenderAgent extends Agent {
 
 
         public TransactSendBehaviour(Agent a, AID receiverAgent, String currency, double valCurr, String prodID) {
+
             super(a);
+
+            myLogger.log(Logger.FINE, "Starting TransactSendBehaviour");
+
             this.receiverAgent = receiverAgent;
             this.state = State.INITIAL;
 
@@ -90,6 +111,8 @@ public class TransactionSenderAgent extends Agent {
             paymentProposal.setCurrencyvalue(valCurr);
 
             this.convId = UUID.randomUUID(); //set the conversation id
+
+            this.maxRetries = 5;
 
             this.ontology = getContentManager().lookupOntology(LNTxOntology.ONTOLOGY_NAME);
         }
@@ -104,15 +127,22 @@ public class TransactionSenderAgent extends Agent {
             switch (state) {
                 case INITIAL:
 
-                    //TODO: RAJOITA KUINKA MONTA YRITYSTÄ JOS REJECT
-
                     try {
 
                         double currVal = paymentProposal.getCurrencyvalue();
                         String currency = paymentProposal.getCurrency();
 
+                        if (currVal < 0) {
+                            throw new RuntimeException("Currency value cannot be negative.");
+                        } else if (currency.isEmpty()) {
+                            throw new RuntimeException("Currency unit missing.");
+                        }
+
                         //Get the value converted to satoshis from the API. Cast to int, so satoshis are int value.
                         paymentProposal.setSatsvalue(priceApi.getSatsValue(currVal,currency));
+
+                        myLogger.log(Logger.FINE, "Payment proposal created: "+paymentProposal.getAsStringForLogging());
+
 
                         //SEND THE INITIATION
                         ACLMessage propose = createInitMessage();
@@ -135,25 +165,21 @@ public class TransactionSenderAgent extends Agent {
 
                     } catch (Exception e) {
                         e.printStackTrace();
+
+                        //add to retries if sending initiation fails
+                        retries += 1;
+                        state = State.INITIAL;
                     }
 
                     break;
                 case PROPOSED:
+                    //Receive the accepted message including the invoice
                     if(msgIn != null){
-
-
                         try {
                             PaymentProposalAccepted proposalReply = (PaymentProposalAccepted) myAgent.getContentManager().extractContent(msgIn);
 
                             boolean proposalAccepted = proposalReply.isAccepted();
                             LNInvoice invoice = proposalReply.getLnInvoice();
-
-
-
-
-                            //TODO: validate the incoming message
-
-
 
                             if (proposalAccepted) {
 
@@ -161,6 +187,10 @@ public class TransactionSenderAgent extends Agent {
                                 boolean invoiceValidAndPaid = false;
 
                                 //TODO: VALIDATE AND PAY THE INVOICE
+
+                                //check that the sats value in invoice is the same as in initial proposal
+                                //check that the invoice contains correct message
+                                //paymentProposal.
 
                                 invoiceValidAndPaid = true; //TODO: MOCK ARVO, SIIRRÄ MUUALLE
 
@@ -195,6 +225,7 @@ public class TransactionSenderAgent extends Agent {
                             } else {
                                 //proposal rejected, naively retry
                                 state = State.INITIAL;
+                                retries += 1;
                             }
                         }catch (Exception e) {
                             myLogger.log(Logger.WARNING, "Sender Agent: Error in receiving response to proposal.");
@@ -208,7 +239,6 @@ public class TransactionSenderAgent extends Agent {
                     break;
                 case PAID:
                     //receive the final inform message to conclude the transaction
-
                     if (msgIn != null) {
                         try {
 
@@ -217,10 +247,9 @@ public class TransactionSenderAgent extends Agent {
                             Class trueClass = (new TrueProposition()).getClass();
 
                             if(informClass.equals(trueClass)) {
-                                //TODO:HANDLE ?
                                 state = State.SUCCESS;
+                                myLogger.log(Logger.INFO, "SUCCESS, PAYMENT SENT");
                             } else {
-                                //TODO:HANDLE ?
                                 state = State.FAILURE;
                             }
 
@@ -237,13 +266,17 @@ public class TransactionSenderAgent extends Agent {
 
         public boolean done() {
 
+            //retried too many times
+            if(retries >= maxRetries) {
+                state = State.FAILURE;
+            }
+
             //end
             if (state == State.FAILURE) {
                 myLogger.log(Logger.WARNING, "Transaction failed.");
                 return true;
             }
             if (state == State.SUCCESS) {
-                myLogger.log(Logger.INFO, "Transaction sender: Transaction completed successfully.");
                 return true;
             }
 
@@ -303,8 +336,8 @@ public class TransactionSenderAgent extends Agent {
 
         //TESTING VALUES FOR THE PROTOCOL
         String currency = "eur"; //base currency
-        double valCurr = 0.1; //value in base currency
-        String prodID = "TEST_PROD"; //product id for the receiver
+        double valCurr = 0.7; //value in base currency
+        String prodID = "prod_2"; //product id for the receiver
 
         public StartTransactSendBehaviour(Agent a) {
             this.a = a;
@@ -312,44 +345,9 @@ public class TransactionSenderAgent extends Agent {
 
         public void action() {
 
-            //TEST PRODUCTPRICES
-            //----------------------------
-            ProductCatalog catalog = new ProductCatalog();
-
-            ListedProduct p = new ListedProduct("prod_id_1");
-            p.addPrice(1, "eur");
-            p.addPrice(0.9, "usd");
-            catalog.addProduct(p);
-            p = new ListedProduct("prod_id_2");
-            p.addPrice(2, "eur");
-            p.addPrice(2, "usd");
-            catalog.addProduct(p);
-            //try adding again the same prod
-            p = new ListedProduct("prod_id_1");
-            p.addPrice(5, "eur");
-            p.addPrice(6, "usd");
-            catalog.addProduct(p);
-            
-
-            System.out.println("true: "+catalog.hasProductWithPrice("prod_id_1",1,"eur"));
-            System.out.println("true: "+catalog.hasProductWithPrice("prod_id_2",2,"usd"));
-            System.out.println("true: "+catalog.hasProductWithPrice("prod_id_1",5,"eur"));
-            System.out.println("false: "+catalog.hasProductWithPrice("prod_id_1",20,"eur"));
-            System.out.println("false: "+catalog.hasProductWithPrice("prod_id_3",1,"eur"));
-            System.out.println("false: "+catalog.hasProductWithPrice("prod_id_3",2,"eur"));
-            System.out.println("false: "+catalog.hasProductWithPrice("prod_id_2",1,"eur"));
-            System.out.println("false: "+catalog.hasProductWithPrice("prod_id_2",2,"xxx"));
-
-
-            //----------------------------
-
-
-
-
             //ticker behaviour to make multiple payments
             addBehaviour(new TickerBehaviour(a, 10000) {
                 protected void onTick() {
-                    myLogger.log(Logger.INFO, "Start finding receivers");
 
                     //Find receivers
                     DFAgentDescription template = new DFAgentDescription();
@@ -361,7 +359,6 @@ public class TransactionSenderAgent extends Agent {
                         DFAgentDescription[] result = DFService.search(myAgent, template);
 
                         if(result.length > 0) {
-                            myLogger.log(Logger.INFO, "Found a receiver, starting TransactSendBehaviour");
                             AID receiver = result[0].getName();
                             addBehaviour(new TransactSendBehaviour(a, receiver, currency, valCurr, prodID));
                         } else {

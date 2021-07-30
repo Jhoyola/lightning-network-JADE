@@ -14,4 +14,10 @@ public class PaymentProposal extends TxValue {
         this.prodid = prodid;
     }
 
+    public String getAsStringForLogging() {
+        return "Product id: "+getProdid()+
+                ", value: "+ getCurrencyvalue() +" "+getCurrency()+
+                ", satoshis: "+getSatsvalue();
+    }
+
 }
