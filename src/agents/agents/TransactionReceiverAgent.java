@@ -14,14 +14,10 @@ import jade.core.*;
 import jade.core.behaviours.*;
 import jade.domain.FIPANames;
 import jade.lang.acl.ACLMessage;
-import jade.domain.FIPAAgentManagement.ServiceDescription;
-import jade.domain.FIPAAgentManagement.DFAgentDescription;
-import jade.domain.DFService;
-import jade.domain.FIPAException;
 import jade.lang.acl.MessageTemplate;
-import jade.tools.DummyAgent.DummyAgent;
 import jade.util.Logger;
 
+import java.util.ArrayList;
 import java.util.UUID;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
@@ -43,7 +39,6 @@ public class TransactionReceiverAgent extends Agent{
 
     private ProductCatalog productCatalog;
 
-    //TODO: Get price tolerance dynamically from agent arguments
     //Price tolerance: accepted relative deviation in bitcoin price (0-1)
     private double priceTolerance = 0.01; // 1 %
 
@@ -66,37 +61,33 @@ public class TransactionReceiverAgent extends Agent{
 
         //Use different price api than the sender to simulate realistic situation
         priceApi = new PriceAPIWrapper(new PriceAPICoindesk());
-
         productCatalog = new ProductCatalog();
 
-        ListedProduct p = new ListedProduct("prod_1");
-        p.addPrice(0.2, "eur");
-        p.addPrice(0.22, "usd");
-        productCatalog.addProduct(p);
-
-        p = new ListedProduct("prod_2");
-        p.addPrice(0.6, "eur");
-        p.addPrice(0.7, "eur");
-        p.addPrice(0.8, "eur");
-        productCatalog.addProduct(p);
-
-        // Registration with the DF for the initiation
-        DFAgentDescription dfd = new DFAgentDescription();
-        dfd.setName(getAID());
-        ServiceDescription sd = new ServiceDescription();
-        sd.setType("receive-ln-tx");
-        sd.setName("TransactionReceiverAgentService");
-        dfd.addServices(sd);
-        try {
-            DFService.register(this, dfd);
-            addBehaviour(new TransactReceiveBehaviour(this));
-        } catch (FIPAException e) {
-            myLogger.log(Logger.SEVERE, "Agent "+getLocalName()+" - Cannot register with DF", e);
-            doDelete();
-        }
     }
 
-    private class TransactReceiveBehaviour extends Behaviour {
+    protected void addProductToCatalog(String prodId, ArrayList<ProductPrice> prices) {
+
+        ListedProduct p = new ListedProduct(prodId);
+
+        for (int i = 0; i < prices.size(); i++) {
+            p.addPrice(prices.get(i).getPrice(), prices.get(i).getCurrency());
+        }
+
+        productCatalog.addProduct(p);
+    }
+
+    protected void setPriceTolerance(double tol) {
+        if(tol < 0 || tol > 1) {
+            throw new RuntimeException("Price tolerance out of bounds.");
+        }
+        priceTolerance = tol;
+    }
+
+    protected void setPriceApi(PriceAPI priceApiImplementation) {
+        priceApi = new PriceAPIWrapper(priceApiImplementation);
+    }
+
+    protected class TransactReceiveBehaviour extends Behaviour {
 
         //The counterparty agent
         private AID senderAgent;
@@ -109,10 +100,13 @@ public class TransactionReceiverAgent extends Agent{
 
         private PaymentProposal receivedPaymentProposal;
 
+        //if false, stop after receiving one successful payment or failure
+        private boolean perpetualOperation;
 
-        public TransactReceiveBehaviour(Agent a) {
+        protected TransactReceiveBehaviour(Agent a, boolean perpetual) {
             super(a);
             myLogger.log(Logger.FINE, "Starting TransactReceiveBehaviour");
+            perpetualOperation = perpetual;
             initializeBehaviour();
         }
 
@@ -275,16 +269,21 @@ public class TransactionReceiverAgent extends Agent{
             if (state == State.FAILURE) {
                 myLogger.log(Logger.WARNING, "Transaction failed.");
 
-                //never finish receiving action
-                //return true;
+                //quit behaviour if not perpetual
+                if(!perpetualOperation) {
+                    return true;
+                }
 
                 //if finish, then init the state
                 initializeBehaviour();
             }
 
             if (state == State.SUCCESS) {
-                //never finish receiving action
-                //return true;
+
+                //quit behaviour if not perpetual
+                if(!perpetualOperation) {
+                    return true;
+                }
 
                 //if finish, then init the state
                 initializeBehaviour();

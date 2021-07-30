@@ -1,5 +1,5 @@
 package util;
 
-interface PriceAPI {
+public interface PriceAPI {
     double getBTCPrice(String currency);
 }
