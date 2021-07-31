@@ -15,6 +15,8 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
     protected void setup() {
         super.setup();
 
+        enableDebugLogging();
+
         addBehaviour(new LoopTransactSendBehaviour(this));
     }
 
@@ -34,32 +36,40 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
 
         public void action() {
 
+            //just one payment
+            findReceiverAndSend();
+
+            /*
             //ticker behaviour to make multiple payments
             addBehaviour(new TickerBehaviour(a, 10000) {
                 protected void onTick() {
-
-                    //Find receivers
-                    DFAgentDescription template = new DFAgentDescription();
-                    ServiceDescription sd = new ServiceDescription();
-                    sd.setType("receive-ln-tx");
-                    template.addServices(sd);
-
-                    try {
-                        DFAgentDescription[] result = DFService.search(myAgent, template);
-
-                        if(result.length > 0) {
-                            AID receiver = result[0].getName();
-                            addBehaviour(new TransactSendBehaviour(a, receiver, currency, valCurr, prodID));
-                        } else {
-                            System.out.println("Didn't find a receiver");
-                        }
-                    }
-                    catch (FIPAException fe) {
-                        fe.printStackTrace();
-                    }
+                    findReceiverAndSend();
                 }
             } );
+            */
 
+        }
+
+        void findReceiverAndSend() {
+            //Find receivers
+            DFAgentDescription template = new DFAgentDescription();
+            ServiceDescription sd = new ServiceDescription();
+            sd.setType("receive-ln-tx");
+            template.addServices(sd);
+
+            try {
+                DFAgentDescription[] result = DFService.search(myAgent, template);
+
+                if(result.length > 0) {
+                    AID receiver = result[0].getName();
+                    addBehaviour(new TransactSendBehaviour(a, receiver, currency, valCurr, prodID));
+                } else {
+                    System.out.println("Didn't find a receiver");
+                }
+            }
+            catch (FIPAException fe) {
+                fe.printStackTrace();
+            }
         }
     }
 

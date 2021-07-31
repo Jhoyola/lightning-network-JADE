@@ -17,7 +17,6 @@ import jade.domain.FIPANames;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.util.Logger;
-
 import java.util.ArrayList;
 import java.util.UUID;
 
@@ -41,16 +40,6 @@ public class TransactionSenderAgent extends Agent {
 
     protected void setup() {
 
-        //set logging level
-        boolean debug = true;
-        if (debug) {
-            //debug logging
-            myLogger.setLevel(Logger.FINE);
-        } else {
-            //normal logging
-            myLogger.setLevel(Logger.INFO);
-        }
-
         // Register the codec for the SL0 language
         getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL0);
         // Register the ontology used by this application
@@ -62,6 +51,11 @@ public class TransactionSenderAgent extends Agent {
 
     protected void setPriceApi(PriceAPI priceApiImplementation) {
         priceApi = new PriceAPIWrapper(priceApiImplementation);
+    }
+
+    protected void enableDebugLogging() {
+        myLogger.setLevel(Logger.FINE);
+        //TODO: NOT WORKING UNLESS LOGGER MANAGER IS ACTIVATED
     }
 
 

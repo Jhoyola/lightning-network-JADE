@@ -44,6 +44,8 @@ public class TransactionReceiverAgent extends Agent{
 
     protected void setup() {
 
+        System.out.println(myLogger.getName());
+
         //set logging level
         boolean debug = true;
         if (debug) {
@@ -85,6 +87,11 @@ public class TransactionReceiverAgent extends Agent{
 
     protected void setPriceApi(PriceAPI priceApiImplementation) {
         priceApi = new PriceAPIWrapper(priceApiImplementation);
+    }
+
+    protected void enableDebugLogging() {
+        myLogger.setLevel(Logger.FINE);
+        //TODO: NOT WORKING UNLESS LOGGER MANAGER IS ACTIVATED
     }
 
     protected class TransactReceiveBehaviour extends Behaviour {

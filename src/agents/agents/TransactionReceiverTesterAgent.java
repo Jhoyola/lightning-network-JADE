@@ -14,6 +14,8 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
     protected void setup() {
         super.setup();
 
+        enableDebugLogging();
+
         //ADD SOME PRODUCTS FOR TESTING
         ArrayList<ProductPrice> prices = new ArrayList<ProductPrice>();
         prices.add(new ProductPrice(0.2, "eur"));
@@ -26,7 +28,7 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
         prices.add(new ProductPrice(0.8, "eur"));
         addProductToCatalog("prod_2", prices);
 
-        //REGISTRATION FOR TESTING
+
         // Registration with the DF for the initiation
         DFAgentDescription dfd = new DFAgentDescription();
         dfd.setName(getAID());
