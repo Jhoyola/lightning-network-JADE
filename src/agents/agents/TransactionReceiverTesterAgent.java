@@ -16,6 +16,8 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
 
         enableDebugLogging();
 
+        setLNHost("192.168.1.83", 10001);
+
         //ADD SOME PRODUCTS FOR TESTING
         ArrayList<ProductPrice> prices = new ArrayList<ProductPrice>();
         prices.add(new ProductPrice(0.2, "eur"));

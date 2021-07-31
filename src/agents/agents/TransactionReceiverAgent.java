@@ -16,11 +16,8 @@ import jade.domain.FIPANames;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.util.Logger;
-
 import java.util.ArrayList;
 import java.util.UUID;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Handler;
 
 import util.*;
 
@@ -36,6 +33,8 @@ public class TransactionReceiverAgent extends Agent{
     private Logger myLogger = Logger.getJADELogger(getClass().getName());
 
     private PriceAPIWrapper priceApi;
+
+    private LNgrpcClient lnClient;
 
     private ProductCatalog productCatalog;
 
@@ -65,6 +64,14 @@ public class TransactionReceiverAgent extends Agent{
         priceApi = new PriceAPIWrapper(new PriceAPICoindesk());
         productCatalog = new ProductCatalog();
 
+    }
+
+    protected void setLNHost(String host, int port) {
+        //TODO ADD MACAROONS OR OR AUTH!
+        lnClient = new LNgrpcClient(host, port);
+
+        //TODO REMOVE TEST:
+        System.out.println(lnClient.getInfo());
     }
 
     protected void addProductToCatalog(String prodId, ArrayList<ProductPrice> prices) {
