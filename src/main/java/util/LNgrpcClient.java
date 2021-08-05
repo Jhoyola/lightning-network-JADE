@@ -1,9 +1,7 @@
 package util;
 
 import io.grpc.*;
-import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
-import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 
 import lnrpc.LightningGrpc;
 import lnrpc.Rpc;
@@ -14,8 +12,9 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.concurrent.Executor;
 
+import org.json.simple.JSONObject;
+import org.json.simple.parser.*;
 import org.apache.commons.codec.binary.Hex;
-
 
 class MacaroonCallCredential extends CallCredentials {
     private final String macaroon;
@@ -85,15 +84,41 @@ public class LNgrpcClient {
         stub = stub_;
     }
 
-    //FOR TESTING!!!!!
-    public void test() {
-
-        try {
-            Rpc.GetInfoResponse response = stub.getInfo(Rpc.GetInfoRequest.getDefaultInstance());
-            System.out.println(response.getIdentityPubkey());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
+    private Rpc.ChannelBalanceResponse getChannelBalance() {
+        return stub.channelBalance(Rpc.ChannelBalanceRequest.getDefaultInstance());
     }
+
+    private String createJsonMemo(String convId, String prodId, double amountCurr, String currency) {
+
+        JSONObject jsonMemo = new JSONObject();
+        jsonMemo.put("convId", convId);
+        jsonMemo.put("prodId", prodId);
+        jsonMemo.put("amountCurr", amountCurr);
+        jsonMemo.put("currency", currency);
+
+        return jsonMemo.toJSONString();
+    }
+
+    //retuns the balance in sats that can be sent
+    public long getSendableBalance() {
+        return getChannelBalance().getLocalBalance().getSat();
+    }
+
+    //retuns the balance in sats that can be received
+    public long getReceivableBalance() {
+        return getChannelBalance().getRemoteBalance().getSat();
+    }
+
+    public String createInvoice(long amount, String convId, String prodId, double amountCurr, String currency) {
+        Rpc.Invoice.Builder invoiceBuilder = Rpc.Invoice.newBuilder();
+        invoiceBuilder.setValue(amount); //value in satoshis
+
+        //create the memo of the invoice
+        invoiceBuilder.setMemo(createJsonMemo(convId, prodId, amountCurr, currency));
+
+        Rpc.Invoice i = invoiceBuilder.build();
+        Rpc.AddInvoiceResponse response = stub.addInvoice(i);
+        return response.getPaymentRequest();
+    }
+
 }

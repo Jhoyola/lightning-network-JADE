@@ -1,8 +1,6 @@
 package agents;
 
 import LNTxOntology.*;
-import jade.content.AgentAction;
-import jade.content.ContentElement;
 import jade.content.Predicate;
 import jade.content.abs.AbsPredicate;
 import jade.content.lang.Codec;
@@ -17,7 +15,6 @@ import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.util.Logger;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.UUID;
 
@@ -179,6 +176,13 @@ public class TransactionReceiverAgent extends Agent{
                                 //TODO: PALAUTA SYY MIKSI REJECT (too big value deviation)
                             }
 
+                            if(lnClient.getReceivableBalance() < proposedSatsValue) {
+                                //too little incoming ln balance
+                                myLogger.log(Logger.WARNING, "Receiver Agent: too little incoming channel balance.)");
+                                acceptProposal = false;
+                                //TODO: PALAUTA SYY MIKSI REJECT (too little incoming channel balance)
+                            }
+
                             if (acceptProposal) {
 
                                 convId = UUID.fromString(msgIn.getConversationId());
@@ -188,14 +192,15 @@ public class TransactionReceiverAgent extends Agent{
                                 ACLMessage accept = msgIn.createReply();
                                 accept.setPerformative(ACLMessage.ACCEPT_PROPOSAL);
 
-                                //TODO: CREATE INVOICE
+                                //TODO: ERROR HANDLING
                                 //create the invoice and add message to the invoice (conv id, payment proposal)
-
-                                //TODO
-                                //TODO
-                                //TODO
-                                String invoiceStr = "test_invoice_string";
-
+                                String invoiceStr = lnClient.createInvoice(
+                                        proposedSatsValue,
+                                        convId.toString(),
+                                        receivedPaymentProposal.getProdid(),
+                                        receivedPaymentProposal.getCurrencyvalue(),
+                                        receivedPaymentProposal.getCurrency()
+                                );
 
                                 //Construct agent action and add as content
                                 LNInvoice invoice = new LNInvoice();

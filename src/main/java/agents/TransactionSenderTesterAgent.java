@@ -54,7 +54,7 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
 
             //Wait to be sure that the other agent is created
             try {
-                Thread.sleep(3000);
+                Thread.sleep(10000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

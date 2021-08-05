@@ -19,7 +19,7 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
 
         enableDebugLogging();
 
-        setLNHost("192.168.1.83", 10001, "src/main/resources/tls.cert", "src/main/resources/admin.macaroon");
+        setLNHost("192.168.1.83", 10001, "src/main/resources/tls.cert", "src/main/resources/a_admin.macaroon");
 
         //ADD SOME PRODUCTS FOR TESTING
         ArrayList<ProductPrice> prices = new ArrayList<ProductPrice>();
