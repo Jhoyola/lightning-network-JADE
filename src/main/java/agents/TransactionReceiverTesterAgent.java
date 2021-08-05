@@ -28,7 +28,7 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
         addProductToCatalog("prod_1", prices);
 
         prices = new ArrayList<ProductPrice>();
-        prices.add(new ProductPrice(0.6, "eur"));
+        prices.add(new ProductPrice(0.15, "eur"));
         prices.add(new ProductPrice(0.7, "eur"));
         prices.add(new ProductPrice(0.8, "eur"));
         addProductToCatalog("prod_2", prices);

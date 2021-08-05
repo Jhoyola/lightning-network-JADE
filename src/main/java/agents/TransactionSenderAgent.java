@@ -1,10 +1,7 @@
 package agents;
 
-import LNTxOntology.*;
-import jade.content.Predicate;
-import jade.content.abs.AbsPredicate;
+
 import jade.content.lang.Codec;
-import jade.content.lang.sl.SL0Vocabulary;
 import jade.content.lang.sl.SLCodec;
 import jade.content.onto.Ontology;
 import jade.content.onto.OntologyException;
@@ -17,9 +14,9 @@ import jade.domain.FIPANames;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.util.Logger;
-import java.util.ArrayList;
 import java.util.UUID;
 
+import LNTxOntology.*;
 import util.*;
 
 
@@ -38,6 +35,8 @@ public class TransactionSenderAgent extends Agent {
 
     private PriceAPIWrapper priceApi;
 
+    private LNgrpcClient lnClient;
+
     protected void setup() {
 
         // Register the codec for the SL0 language
@@ -52,6 +51,10 @@ public class TransactionSenderAgent extends Agent {
 
     protected void setPriceApi(PriceAPI priceApiImplementation) {
         priceApi = new PriceAPIWrapper(priceApiImplementation);
+    }
+
+    protected void setLNHost(String host, int port, String certPath, String macaroonPath) {
+        lnClient = new LNgrpcClient(host, port, certPath, macaroonPath);
     }
 
     protected void enableDebugLogging() {
@@ -127,8 +130,12 @@ public class TransactionSenderAgent extends Agent {
                         //Get the value converted to satoshis from the API. Cast to int, so satoshis are int value.
                         paymentProposal.setSatsvalue(priceApi.getSatsValue(currVal,currency));
 
-                        myLogger.log(Logger.FINE, "Payment proposal created: "+paymentProposal.getAsStringForLogging());
+                        //check that has enough balance to send on the ln node
+                        if (lnClient.getSendableBalance() < paymentProposal.getSatsvalue()) {
+                            throw new RuntimeException("Not enough outgoing balance.");
+                        }
 
+                        myLogger.log(Logger.FINE, "Payment proposal created: "+paymentProposal.getAsStringForLogging());
 
                         //SEND THE INITIATION
                         ACLMessage propose = createInitMessage();
@@ -164,19 +171,33 @@ public class TransactionSenderAgent extends Agent {
                         try {
                             PaymentProposalAccepted proposalReply = (PaymentProposalAccepted) myAgent.getContentManager().extractContent(msgIn);
 
-                            boolean proposalAccepted = proposalReply.isAccepted();
-                            LNInvoice invoice = proposalReply.getLnInvoice();
-
-                            if (proposalAccepted) {
+                            if (proposalReply.isAccepted()) {
 
                                 //by default not paid
                                 boolean invoiceValidAndPaid = false;
 
-                                //TODO: VALIDATE AND PAY THE INVOICE
+                                //Get the lightning network encoded invoice
+                                String invoiceStr = proposalReply.getLnInvoice().getInvoicestr();
+                                //check that the ln invoice amount and memo corresponds to the payment proposal
+                                boolean invoiceOk = lnClient.checkInvoiceStrCorresponds(
+                                        invoiceStr,
+                                        paymentProposal.getSatsvalue(),
+                                        convId.toString(),
+                                        paymentProposal.getProdid(),
+                                        paymentProposal.getCurrencyvalue(),
+                                        paymentProposal.getCurrency());
 
-                                //check that the sats value in invoice is the same as in initial proposal
-                                //check that the invoice contains correct message
-                                //paymentProposal.
+
+                                if(!invoiceOk) {
+
+                                    //TODO: KUMMALLA TAVALLA ERRORHANDLING (boolean vai throw!?)
+                                    invoiceValidAndPaid = false;
+                                    throw new RuntimeException("The invoice is not what was proposed.");
+
+                                }
+
+                                //TODO: PAY THE INVOICE!!
+
 
                                 invoiceValidAndPaid = true; //TODO: MOCK ARVO, SIIRRÄ MUUALLE
 
@@ -187,7 +208,7 @@ public class TransactionSenderAgent extends Agent {
                                     receivedPaymentQueryMsg.setPerformative(ACLMessage.QUERY_IF);
 
                                     ReceivedPaymentQuery invoiceQuery = new ReceivedPaymentQuery();
-                                    invoiceQuery.setLnInvoice(invoice);
+                                    //invoiceQuery.setLnInvoice(invoice); //MUUTA TÄHÄN EHKÄ PELKKÄ INVOICE HASH??
 
                                     Action respondIsPaymentReceivedAction = new Action();
                                     respondIsPaymentReceivedAction.setAction(invoiceQuery);
@@ -214,6 +235,7 @@ public class TransactionSenderAgent extends Agent {
                                 retries += 1;
                             }
                         }catch (Exception e) {
+                            //TODO: BETTER ERRORS
                             myLogger.log(Logger.WARNING, "Sender Agent: Error in receiving response to proposal.");
                             e.printStackTrace();
                             state = State.FAILURE; //FAILED

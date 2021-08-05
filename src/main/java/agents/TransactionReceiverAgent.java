@@ -1,6 +1,6 @@
 package agents;
 
-import LNTxOntology.*;
+
 import jade.content.Predicate;
 import jade.content.abs.AbsPredicate;
 import jade.content.lang.Codec;
@@ -14,10 +14,10 @@ import jade.domain.FIPANames;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.util.Logger;
-
 import java.util.ArrayList;
 import java.util.UUID;
 
+import LNTxOntology.*;
 import util.*;
 
 public class TransactionReceiverAgent extends Agent{

@@ -17,6 +17,8 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
 
         enableDebugLogging();
 
+        setLNHost("192.168.1.83", 10002, "src/main/resources/tls.cert", "src/main/resources/b_admin.macaroon");
+
         addBehaviour(new LoopTransactSendBehaviour(this));
     }
 
@@ -27,7 +29,7 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
 
         //TESTING VALUES FOR THE PROTOCOL
         String currency = "eur"; //base currency
-        double valCurr = 0.7; //value in base currency
+        double valCurr = 0.15; //value in base currency
         String prodID = "prod_2"; //product id for the receiver
 
         public LoopTransactSendBehaviour(Agent a) {

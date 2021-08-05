@@ -121,4 +121,40 @@ public class LNgrpcClient {
         return response.getPaymentRequest();
     }
 
+    public boolean checkInvoiceStrCorresponds(String invoiceStr, int satsValue, String convId, String prodId, double amountCurr, String currency) {
+
+        Rpc.PayReq invoice = stub.decodePayReq(Rpc.PayReqString.newBuilder().setPayReq(invoiceStr).build());
+
+        if(invoice.getNumSatoshis() != satsValue) {
+            return false;
+        }
+
+        //check that the values correspond to the values in the memo message
+        JSONObject memoJsonObj = null;
+        try {
+            JSONParser parser = new JSONParser();
+            memoJsonObj = (JSONObject) parser.parse(invoice.getDescription());
+
+            if(!memoJsonObj.get("convId").toString().equals(convId)) {
+                return false;
+            }
+            if(!memoJsonObj.get("prodId").toString().equals(prodId)) {
+                return false;
+            }
+            if(Double.parseDouble(memoJsonObj.get("amountCurr").toString()) != amountCurr) {
+                return false;
+            }
+            if(!memoJsonObj.get("currency").toString().equals(currency)) {
+                return false;
+            }
+
+        } catch (ParseException e) {
+            e.printStackTrace();
+            return false;
+        }
+
+        return true;
+    }
+
+
 }
