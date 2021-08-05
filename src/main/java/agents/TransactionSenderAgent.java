@@ -45,7 +45,8 @@ public class TransactionSenderAgent extends Agent {
         // Register the ontology used by this application
         getContentManager().registerOntology(LNTxOntology.getInstance());
 
-        priceApi = new PriceAPIWrapper(new PriceAPICoinGecko());
+        //priceApi = new PriceAPIWrapper(new PriceAPICoinGecko());
+        priceApi = new PriceAPIWrapper(new PriceAPIMock()); //TODO: USE REAL API
 
     }
 

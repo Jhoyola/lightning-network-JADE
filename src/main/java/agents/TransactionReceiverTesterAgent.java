@@ -7,7 +7,10 @@ import jade.domain.FIPAException;
 import jade.util.Logger;
 import util.ProductPrice;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.Scanner;
 
 public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
 
@@ -16,7 +19,7 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
 
         enableDebugLogging();
 
-        setLNHost("192.168.1.83", 10001);
+        setLNHost("192.168.1.83", 10001, "src/main/resources/tls.cert", "src/main/resources/admin.macaroon");
 
         //ADD SOME PRODUCTS FOR TESTING
         ArrayList<ProductPrice> prices = new ArrayList<ProductPrice>();

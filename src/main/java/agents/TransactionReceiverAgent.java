@@ -16,6 +16,8 @@ import jade.domain.FIPANames;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.util.Logger;
+
+import java.io.File;
 import java.util.ArrayList;
 import java.util.UUID;
 
@@ -61,17 +63,14 @@ public class TransactionReceiverAgent extends Agent{
         getContentManager().registerOntology(LNTxOntology.getInstance());
 
         //Use different price api than the sender to simulate realistic situation
-        priceApi = new PriceAPIWrapper(new PriceAPICoindesk());
+        //priceApi = new PriceAPIWrapper(new PriceAPICoindesk());
+        priceApi = new PriceAPIWrapper(new PriceAPIMock()); //TODO: USE REAL API
         productCatalog = new ProductCatalog();
 
     }
 
-    protected void setLNHost(String host, int port) {
-        //TODO ADD MACAROONS OR OR AUTH!
-        lnClient = new LNgrpcClient(host, port);
-
-        //TODO REMOVE TEST:
-        System.out.println(lnClient.getInfo());
+    protected void setLNHost(String host, int port, String certPath, String macaroonPath) {
+        lnClient = new LNgrpcClient(host, port, certPath, macaroonPath);
     }
 
     protected void addProductToCatalog(String prodId, ArrayList<ProductPrice> prices) {
