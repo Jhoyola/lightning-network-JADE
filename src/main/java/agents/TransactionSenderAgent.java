@@ -79,6 +79,8 @@ public class TransactionSenderAgent extends Agent {
 
         private PaymentProposal paymentProposal;
 
+        private String rHashHex;
+
         //template for replies, updated on every state
         private MessageTemplate replyTemplate;
 
@@ -196,10 +198,18 @@ public class TransactionSenderAgent extends Agent {
 
                                 }
 
-                                //TODO: PAY THE INVOICE!!
+                                //TODO CHECK IF SENT AND NO ERRORS
+                                //SAVE THE PAYMENT HASH
+                                String paymentHash = lnClient.sendPayment(invoiceStr);
 
+                                if(paymentHash.isEmpty()) {
+                                    //TODO: KUMMALLA TAVALLA ERRORHANDLING (boolean vai throw!?)
+                                    invoiceValidAndPaid = false;
+                                    throw new RuntimeException("Paying the invoice failed.");
+                                } else {
+                                    invoiceValidAndPaid = true;
+                                }
 
-                                invoiceValidAndPaid = true; //TODO: MOCK ARVO, SIIRRÄ MUUALLE
 
                                 if (invoiceValidAndPaid) {
 
@@ -208,7 +218,7 @@ public class TransactionSenderAgent extends Agent {
                                     receivedPaymentQueryMsg.setPerformative(ACLMessage.QUERY_IF);
 
                                     ReceivedPaymentQuery invoiceQuery = new ReceivedPaymentQuery();
-                                    //invoiceQuery.setLnInvoice(invoice); //MUUTA TÄHÄN EHKÄ PELKKÄ INVOICE HASH??
+                                    invoiceQuery.setPaymentHash(paymentHash);
 
                                     Action respondIsPaymentReceivedAction = new Action();
                                     respondIsPaymentReceivedAction.setAction(invoiceQuery);
@@ -256,7 +266,7 @@ public class TransactionSenderAgent extends Agent {
 
                             if(informClass.equals(trueClass)) {
                                 state = State.SUCCESS;
-                                myLogger.log(Logger.INFO, "SUCCESS, PAYMENT SENT");
+                                myLogger.log(Logger.INFO, "SENDER: SUCCESS, PAYMENT SENT AND RECEPTION CONFIRMED");
                             } else {
                                 state = State.FAILURE;
                             }

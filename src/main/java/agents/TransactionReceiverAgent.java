@@ -42,8 +42,6 @@ public class TransactionReceiverAgent extends Agent{
 
     protected void setup() {
 
-        System.out.println(myLogger.getName());
-
         //set logging level
         boolean debug = true;
         if (debug) {
@@ -110,6 +108,8 @@ public class TransactionReceiverAgent extends Agent{
 
         private PaymentProposal receivedPaymentProposal;
 
+        private String rHashHex;
+
         //if false, stop after receiving one successful payment or failure
         private boolean perpetualOperation;
 
@@ -151,7 +151,7 @@ public class TransactionReceiverAgent extends Agent{
                                 //TODO: PALAUTA SYY MIKSI REJECT
                             }
 
-                            PaymentProposal receivedPaymentProposal = acceptPaymentProposalAndCreateLNInvoice.getPaymentProposal();
+                            receivedPaymentProposal = acceptPaymentProposalAndCreateLNInvoice.getPaymentProposal();
 
                             //validate that the product is allowed
                             if (!productCatalog.hasProductWithPrice(receivedPaymentProposal.getProdid(),receivedPaymentProposal.getCurrencyvalue(),receivedPaymentProposal.getCurrency())) {
@@ -194,13 +194,17 @@ public class TransactionReceiverAgent extends Agent{
 
                                 //TODO: ERROR HANDLING
                                 //create the invoice and add message to the invoice (conv id, payment proposal)
-                                String invoiceStr = lnClient.createInvoice(
+                                String[] createdInvoiceTuple = lnClient.createInvoice(
                                         proposedSatsValue,
                                         convId.toString(),
                                         receivedPaymentProposal.getProdid(),
                                         receivedPaymentProposal.getCurrencyvalue(),
                                         receivedPaymentProposal.getCurrency()
                                 );
+
+                                String invoiceStr = createdInvoiceTuple[0];
+                                //save the rHash
+                                rHashHex = createdInvoiceTuple[1];
 
                                 //Construct agent action and add as content
                                 LNInvoice invoice = new LNInvoice();
@@ -241,6 +245,9 @@ public class TransactionReceiverAgent extends Agent{
                     if (msgIn != null) {
                         try {
 
+                            //default false
+                            boolean paymentReceived = false;
+
                             //Counterparty couldn't make the payment
                             if(msgIn.getPerformative() == ACLMessage.FAILURE) {
                                 //failure: payment is not paid
@@ -249,9 +256,31 @@ public class TransactionReceiverAgent extends Agent{
                                 break; //quit the action
                             }
 
-                            //TODO: CHECK THAT PAYMENT IS RECEIVED
+                            Action contentAction = (Action)myAgent.getContentManager().extractContent(msgIn);
+                            ReceivedPaymentQuery query = (ReceivedPaymentQuery) contentAction.getAction();
+                            String senderPaymentHash = query.getPaymentHash();
 
-                            boolean paymentReceived = true;
+                            //check that payment hashes (rHashes) correspond
+                            if (!senderPaymentHash.equals(rHashHex)) {
+                                myLogger.log(Logger.WARNING, "The payment hash does not correspond to the invoice.");
+                                //TODO: FAILURE
+                                state = State.FAILURE;
+                                break; //quit the action
+                            }
+
+                            long receivedAmount = lnClient.amountOfPaymentReceived(senderPaymentHash);
+                            int proposedAmount = receivedPaymentProposal.getSatsvalue();
+
+                            //check that the amount received corresponds to the proposed amount
+                            if (receivedAmount >= proposedAmount) {
+                                paymentReceived = true;
+
+                                if(receivedAmount > proposedAmount) {
+                                    //received more than required
+                                    myLogger.log(Logger.INFO, "Received "+String.valueOf(receivedAmount)+", instead of "+String.valueOf(proposedAmount));
+                                }
+                            }
+
                             if (paymentReceived) {
 
                                 //reply true
@@ -263,7 +292,7 @@ public class TransactionReceiverAgent extends Agent{
 
                                 myAgent.send(informTrue);
                                 state = State.SUCCESS;
-                                myLogger.log(Logger.INFO, "SUCCESS, PAYMENT RECEIVED");
+                                myLogger.log(Logger.INFO, "RECEIVER: SUCCESS, RECEIVED "+String.valueOf(receivedAmount)+" sats");
 
                             } else {
                                 //TODO: FAILURE

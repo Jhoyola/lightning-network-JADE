@@ -4,13 +4,13 @@ import jade.content.AgentAction;
 
 public class ReceivedPaymentQuery implements AgentAction {
 
-    private LNInvoice lnInvoice;
+    private String paymentHash;
 
-    public void setLnInvoice(LNInvoice lnInvoice) {
-        this.lnInvoice = lnInvoice;
+    public String getPaymentHash() {
+        return paymentHash;
     }
 
-    public LNInvoice getLnInvoice() {
-        return lnInvoice;
+    public void setPaymentHash(String paymentHash) {
+        this.paymentHash = paymentHash;
     }
 }

@@ -1,8 +1,12 @@
 package util;
 
+import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.*;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 
+import io.grpc.netty.shaded.io.netty.handler.codec.bytes.ByteArrayDecoder;
+import io.grpc.netty.shaded.io.netty.handler.codec.bytes.ByteArrayEncoder;
 import lnrpc.LightningGrpc;
 import lnrpc.Rpc;
 
@@ -12,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.concurrent.Executor;
 
+import org.apache.commons.codec.DecoderException;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.*;
 import org.apache.commons.codec.binary.Hex;
@@ -109,7 +114,7 @@ public class LNgrpcClient {
         return getChannelBalance().getRemoteBalance().getSat();
     }
 
-    public String createInvoice(long amount, String convId, String prodId, double amountCurr, String currency) {
+    public String[] createInvoice(long amount, String convId, String prodId, double amountCurr, String currency) {
         Rpc.Invoice.Builder invoiceBuilder = Rpc.Invoice.newBuilder();
         invoiceBuilder.setValue(amount); //value in satoshis
 
@@ -118,7 +123,11 @@ public class LNgrpcClient {
 
         Rpc.Invoice i = invoiceBuilder.build();
         Rpc.AddInvoiceResponse response = stub.addInvoice(i);
-        return response.getPaymentRequest();
+
+        String rHashHex = String.valueOf(Hex.encodeHex(response.getRHash().toByteArray()));
+
+        //return 2 strings: payment request [0] and rHash [1]
+        return new String[]{response.getPaymentRequest(), rHashHex};
     }
 
     public boolean checkInvoiceStrCorresponds(String invoiceStr, int satsValue, String convId, String prodId, double amountCurr, String currency) {
@@ -154,6 +163,32 @@ public class LNgrpcClient {
         }
 
         return true;
+    }
+
+    public String sendPayment(String invoice) {
+        Rpc.SendResponse response = stub.sendPaymentSync(Rpc.SendRequest.newBuilder().setPaymentRequest(invoice).build());
+
+        //TODO ERROR HANDLING
+        //response.getPaymentError()
+
+        //paymentHash is equivalent of RHash in the invoice!
+        return String.valueOf(Hex.encodeHex(response.getPaymentHash().toByteArray()));
+    }
+
+    public long amountOfPaymentReceived(String rHashHex) {
+
+        try {
+            Rpc.PaymentHash rHashRequest = Rpc.PaymentHash.newBuilder().setRHash(ByteString.copyFrom(Hex.decodeHex(rHashHex.toCharArray()))).build();
+
+            Rpc.Invoice response = stub.lookupInvoice(rHashRequest);
+            return response.getAmtPaidSat();
+
+        } catch (DecoderException e) {
+            e.printStackTrace();
+        }
+
+        //not paid!
+        return 0;
     }
 
 
