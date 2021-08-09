@@ -58,8 +58,7 @@ public class TransactionReceiverAgent extends Agent{
         getContentManager().registerOntology(LNTxOntology.getInstance());
 
         //Use different price api than the sender to simulate realistic situation
-        //priceApi = new PriceAPIWrapper(new PriceAPICoindesk());
-        priceApi = new PriceAPIWrapper(new PriceAPIMock()); //TODO: USE REAL API
+        priceApi = new PriceAPIWrapper(new PriceAPICoindesk());
         productCatalog = new ProductCatalog();
 
     }
@@ -192,7 +191,6 @@ public class TransactionReceiverAgent extends Agent{
                                 ACLMessage accept = msgIn.createReply();
                                 accept.setPerformative(ACLMessage.ACCEPT_PROPOSAL);
 
-                                //TODO: ERROR HANDLING
                                 //create the invoice and add message to the invoice (conv id, payment proposal)
                                 String[] createdInvoiceTuple = lnClient.createInvoice(
                                         proposedSatsValue,

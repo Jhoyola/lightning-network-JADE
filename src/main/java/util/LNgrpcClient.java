@@ -130,7 +130,7 @@ public class LNgrpcClient {
         return getChannelBalance().getRemoteBalance().getSat();
     }
 
-    public String[] createInvoice(long amount, String convId, String prodId, double amountCurr, String currency) {
+    public String[] createInvoice(long amount, String convId, String prodId, double amountCurr, String currency) throws LightningNetworkException {
         if(useMock) {
             return new String[]{"mock_paymentrequest", "mock_rhash"};
         }
@@ -143,6 +143,10 @@ public class LNgrpcClient {
 
         Rpc.Invoice i = invoiceBuilder.build();
         Rpc.AddInvoiceResponse response = stub.addInvoice(i);
+
+        if(!response.getInitializationErrorString().isEmpty()) {
+            throw new LightningNetworkException(response.getInitializationErrorString());
+        }
 
         String rHashHex = String.valueOf(Hex.encodeHex(response.getRHash().toByteArray()));
 
@@ -188,15 +192,17 @@ public class LNgrpcClient {
         return true;
     }
 
-    public String sendPayment(String invoice) {
+    public String sendPayment(String invoice) throws LightningNetworkException{
         if(useMock) {
             return "mock_rhash";
         }
 
         Rpc.SendResponse response = stub.sendPaymentSync(Rpc.SendRequest.newBuilder().setPaymentRequest(invoice).build());
 
-        //TODO ERROR HANDLING
-        //response.getPaymentError()
+        //throw if has any errors
+        if(!response.getPaymentError().isEmpty()) {
+            throw new LightningNetworkException(response.getPaymentError());
+        }
 
         //return paymentHash (equivalent of RHash in the invoice!)
         return String.valueOf(Hex.encodeHex(response.getPaymentHash().toByteArray()));

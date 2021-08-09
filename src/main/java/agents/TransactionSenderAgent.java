@@ -44,8 +44,7 @@ public class TransactionSenderAgent extends Agent {
         // Register the ontology used by this application
         getContentManager().registerOntology(LNTxOntology.getInstance());
 
-        //priceApi = new PriceAPIWrapper(new PriceAPICoinGecko());
-        priceApi = new PriceAPIWrapper(new PriceAPIMock()); //TODO: USE REAL API
+        priceApi = new PriceAPIWrapper(new PriceAPICoinGecko());
 
     }
 
@@ -200,9 +199,9 @@ public class TransactionSenderAgent extends Agent {
 
                                 //TODO CHECK IF SENT AND NO ERRORS
                                 //SAVE THE PAYMENT HASH
-                                String paymentHash = lnClient.sendPayment(invoiceStr);
+                                rHashHex = lnClient.sendPayment(invoiceStr);
 
-                                if(paymentHash.isEmpty()) {
+                                if(rHashHex.isEmpty()) {
                                     //TODO: KUMMALLA TAVALLA ERRORHANDLING (boolean vai throw!?)
                                     invoiceValidAndPaid = false;
                                     throw new RuntimeException("Paying the invoice failed.");
@@ -218,7 +217,7 @@ public class TransactionSenderAgent extends Agent {
                                     receivedPaymentQueryMsg.setPerformative(ACLMessage.QUERY_IF);
 
                                     ReceivedPaymentQuery invoiceQuery = new ReceivedPaymentQuery();
-                                    invoiceQuery.setPaymentHash(paymentHash);
+                                    invoiceQuery.setPaymentHash(rHashHex);
 
                                     Action respondIsPaymentReceivedAction = new Action();
                                     respondIsPaymentReceivedAction.setAction(invoiceQuery);
