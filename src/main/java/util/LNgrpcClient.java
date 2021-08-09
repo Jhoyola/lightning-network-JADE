@@ -53,8 +53,18 @@ public class LNgrpcClient {
 
     private final LightningGrpc.LightningBlockingStub stub;
 
+    private boolean useMock;
+
     public LNgrpcClient(String host, int port, String certPath, String macaroonPath) {
 
+        //leave host empty to use mock version
+        if(host.isEmpty()) {
+            useMock = true;
+            stub = null;
+            return;
+        }
+
+        useMock = false;
         LightningGrpc.LightningBlockingStub stub_;
 
         try {
@@ -106,15 +116,25 @@ public class LNgrpcClient {
 
     //retuns the balance in sats that can be sent
     public long getSendableBalance() {
+        if(useMock) {
+            return 9999999;
+        }
         return getChannelBalance().getLocalBalance().getSat();
     }
 
     //retuns the balance in sats that can be received
     public long getReceivableBalance() {
+        if(useMock) {
+            return 9999999;
+        }
         return getChannelBalance().getRemoteBalance().getSat();
     }
 
     public String[] createInvoice(long amount, String convId, String prodId, double amountCurr, String currency) {
+        if(useMock) {
+            return new String[]{"mock_paymentrequest", "mock_rhash"};
+        }
+
         Rpc.Invoice.Builder invoiceBuilder = Rpc.Invoice.newBuilder();
         invoiceBuilder.setValue(amount); //value in satoshis
 
@@ -131,6 +151,9 @@ public class LNgrpcClient {
     }
 
     public boolean checkInvoiceStrCorresponds(String invoiceStr, int satsValue, String convId, String prodId, double amountCurr, String currency) {
+        if(useMock) {
+            return true;
+        }
 
         Rpc.PayReq invoice = stub.decodePayReq(Rpc.PayReqString.newBuilder().setPayReq(invoiceStr).build());
 
@@ -166,16 +189,23 @@ public class LNgrpcClient {
     }
 
     public String sendPayment(String invoice) {
+        if(useMock) {
+            return "mock_rhash";
+        }
+
         Rpc.SendResponse response = stub.sendPaymentSync(Rpc.SendRequest.newBuilder().setPaymentRequest(invoice).build());
 
         //TODO ERROR HANDLING
         //response.getPaymentError()
 
-        //paymentHash is equivalent of RHash in the invoice!
+        //return paymentHash (equivalent of RHash in the invoice!)
         return String.valueOf(Hex.encodeHex(response.getPaymentHash().toByteArray()));
     }
 
     public long amountOfPaymentReceived(String rHashHex) {
+        if(useMock) {
+            return 50000;
+        }
 
         try {
             Rpc.PaymentHash rHashRequest = Rpc.PaymentHash.newBuilder().setRHash(ByteString.copyFrom(Hex.decodeHex(rHashHex.toCharArray()))).build();
