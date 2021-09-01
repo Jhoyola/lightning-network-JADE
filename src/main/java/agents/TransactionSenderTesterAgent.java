@@ -17,7 +17,7 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
 
         enableDebugLogging();
 
-        setLNHost("192.168.1.83", 10001, "src/main/resources/tls.cert", "src/main/resources/a_admin.macaroon");
+        setLNHost("192.168.1.83", 10001, "src/main/resources/tls.cert", "src/main/resources/simnet_a_admin.macaroon");
 
         addBehaviour(new LoopTransactSendBehaviour(this));
     }
