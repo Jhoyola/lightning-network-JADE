@@ -80,6 +80,9 @@ public class TransactionSenderAgent extends Agent {
 
         private String rHashHex;
 
+        //to time the execution time
+        private TransactionTimer timer;
+
         //template for replies, updated on every state
         private MessageTemplate replyTemplate;
 
@@ -91,6 +94,9 @@ public class TransactionSenderAgent extends Agent {
             super(a);
 
             myLogger.log(Logger.FINE, "Starting TransactSendBehaviour");
+
+            timer = new TransactionTimer();
+            timer.setStartTime();
 
             this.receiverAgent = receiverAgent;
             this.state = State.INITIAL;
@@ -198,8 +204,11 @@ public class TransactionSenderAgent extends Agent {
                                 }
 
                                 //TODO CHECK IF SENT AND NO ERRORS
+                                //timing for the actual payment
+                                timer.setPaymentStartTime();
                                 //SAVE THE PAYMENT HASH
                                 rHashHex = lnClient.sendPayment(invoiceStr);
+                                timer.setPaymentEndTime();
 
                                 if(rHashHex.isEmpty()) {
                                     //TODO: KUMMALLA TAVALLA ERRORHANDLING (boolean vai throw!?)
@@ -265,7 +274,9 @@ public class TransactionSenderAgent extends Agent {
 
                             if(informClass.equals(trueClass)) {
                                 state = State.SUCCESS;
+                                timer.setEndTime();
                                 myLogger.log(Logger.INFO, "SENDER: SUCCESS, PAYMENT SENT AND RECEPTION CONFIRMED");
+                                myLogger.log(Logger.INFO, "The timing for the whole protocol: "+timer.getTotalTime()+"ms. The timing for only the payment: "+timer.getPaymentTime()+"ms");
                             } else {
                                 state = State.FAILURE;
                             }
