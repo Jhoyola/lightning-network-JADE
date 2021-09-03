@@ -1,16 +1,17 @@
 package util;
 
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
-
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.TrustAllStrategy;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.http.util.EntityUtils;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.*;
+import org.json.simple.parser.ParseException;
 
 public class PriceAPICoindesk implements PriceAPI {
 
@@ -18,9 +19,17 @@ public class PriceAPICoindesk implements PriceAPI {
     private HttpClient client;
 
     public PriceAPICoindesk() {
-        client = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .build();
+
+        try {
+            //trust all certs
+            client = HttpClients
+                    .custom()
+                    .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build())
+                    .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                    .build();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public double getBTCPrice(String currency) {
@@ -29,33 +38,22 @@ public class PriceAPICoindesk implements PriceAPI {
         currency = currency.toUpperCase();
         double returnPrice = 0;
 
+        HttpGet request = new HttpGet(apiQueryPath);
+
         try {
-            URI apiUrl = new URI(apiQueryPath);
+            HttpResponse response = client.execute(request);
 
-            HttpRequest request = HttpRequest.newBuilder(apiUrl)
-                    .timeout(Duration.ofSeconds(5))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(request,  HttpResponse.BodyHandlers.ofString());
-            String jsonResponseString = response.body();
-            //parse to json object
+            String jsonResponseString = EntityUtils.toString(response.getEntity());
             JSONObject responseJSONObj = (JSONObject) new JSONParser().parse(jsonResponseString);
 
             //get the price from the json object
             returnPrice = Double.parseDouble(((JSONObject)((JSONObject)responseJSONObj.get("bpi")).get(currency)).get("rate_float").toString());
 
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (ParseException e) {
+        } catch (IOException | ParseException e) {
+            //TODO BETTER ERROR HANDLING
             e.printStackTrace();
         }
 
         return returnPrice;
     }
 }
-

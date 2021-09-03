@@ -1,25 +1,35 @@
 package util;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.TrustAllStrategy;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.http.util.EntityUtils;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.*;
+import org.json.simple.parser.ParseException;
 
 public class PriceAPICoinGecko implements PriceAPI {
 
     private static final String apiQueryPath = "https://api.coingecko.com/api/v3/simple/price/";
-    private HttpClient client;
-
+    private HttpClient client = null;
 
     public PriceAPICoinGecko() {
-        client = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .build();
+
+        try {
+            //trust all certs
+            client = HttpClients
+                    .custom()
+                    .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build())
+                    .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                    .build();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public double getBTCPrice(String currency) {
@@ -28,33 +38,23 @@ public class PriceAPICoinGecko implements PriceAPI {
         currency = currency.toLowerCase();
         double returnPrice = 0;
 
+        String queryParamsStr = "ids=bitcoin&vs_currencies="+currency;
+        HttpGet request = new HttpGet(apiQueryPath+"?"+queryParamsStr);
+
         try {
-            String queryParamsStr = "ids=bitcoin&vs_currencies="+currency;
-            URI apiUrl = new URI(apiQueryPath+"?"+queryParamsStr);
+            HttpResponse response = client.execute(request);
 
-            HttpRequest request = HttpRequest.newBuilder(apiUrl)
-                    .timeout(Duration.ofSeconds(5))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(request,  HttpResponse.BodyHandlers.ofString());
-            String jsonResponseString = response.body();
-            //parse to json object
+            String jsonResponseString = EntityUtils.toString(response.getEntity());
             JSONObject responseJSONObj = (JSONObject) new JSONParser().parse(jsonResponseString);
 
             //get the price from the json object
             returnPrice = Double.parseDouble(((JSONObject)responseJSONObj.get("bitcoin")).get(currency).toString());
 
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (ParseException e) {
+        } catch (IOException | ParseException e) {
+            //TODO BETTER ERROR HANDLING
             e.printStackTrace();
         }
-
+        
         return returnPrice;
     }
 }
