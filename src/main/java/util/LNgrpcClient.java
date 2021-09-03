@@ -14,6 +14,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.concurrent.Executor;
 
 import org.apache.commons.codec.DecoderException;
@@ -192,12 +193,15 @@ public class LNgrpcClient {
         return true;
     }
 
-    public String sendPayment(String invoice) throws LightningNetworkException{
+    public String sendPayment(String invoice, int feeLimitSat) throws LightningNetworkException {
         if(useMock) {
             return "mock_rhash";
         }
 
-        Rpc.SendResponse response = stub.sendPaymentSync(Rpc.SendRequest.newBuilder().setPaymentRequest(invoice).build());
+        //Also would have a possibility of percentual fee limit
+        Rpc.FeeLimit feeLimit = Rpc.FeeLimit.newBuilder().setFixed(feeLimitSat).build();
+
+        Rpc.SendResponse response = stub.sendPaymentSync(Rpc.SendRequest.newBuilder().setPaymentRequest(invoice).setFeeLimit(feeLimit).build());
 
         //throw if has any errors
         if(!response.getPaymentError().isEmpty()) {
@@ -227,5 +231,31 @@ public class LNgrpcClient {
         return 0;
     }
 
+    public long getFeesPaid(String rHashHex) throws LightningNetworkException {
+        if(useMock) {
+            return 0;
+        }
+
+        try {
+
+            //get 5 latest payments
+            Rpc.ListPaymentsRequest listPaymentsRequest = Rpc.ListPaymentsRequest.newBuilder().setMaxPayments(5).setReversed(true).build();
+            Rpc.ListPaymentsResponse response = stub.listPayments(listPaymentsRequest);
+            List<Rpc.Payment> paymentsList = response.getPaymentsList();
+
+            //get the fees of the correct payment
+            for (Rpc.Payment payment : paymentsList) {
+                if(rHashHex.equals(payment.getPaymentHash())) {
+                    return payment.getFeeSat();
+                }
+            }
+
+            throw new LightningNetworkException("Payment not found in the last 5 payments");
+
+        } catch (Exception e) {
+            throw new LightningNetworkException(e.getMessage());
+        }
+
+    }
 
 }

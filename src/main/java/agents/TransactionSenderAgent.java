@@ -37,6 +37,9 @@ public class TransactionSenderAgent extends Agent {
 
     private LNgrpcClient lnClient;
 
+    //Maximum fees in sats for a single transaction
+    private int feeLimitSat = 50;
+
     protected void setup() {
 
         // Register the codec for the SL0 language
@@ -54,6 +57,11 @@ public class TransactionSenderAgent extends Agent {
 
     protected void setLNHost(String host, int port, String certPath, String macaroonPath) {
         lnClient = new LNgrpcClient(host, port, certPath, macaroonPath);
+    }
+
+    //set fee limit in satoshis
+    protected void setFeeLimit(int feeLimit) {
+        feeLimitSat = feeLimit;
     }
 
     protected void enableDebugLogging() {
@@ -83,6 +91,8 @@ public class TransactionSenderAgent extends Agent {
         //to time the execution time
         private TransactionTimer timer;
 
+        private long feePaidSats;
+
         //template for replies, updated on every state
         private MessageTemplate replyTemplate;
 
@@ -108,7 +118,7 @@ public class TransactionSenderAgent extends Agent {
 
             this.convId = UUID.randomUUID(); //set the conversation id
 
-            this.maxRetries = 5;
+            this.maxRetries = 3;
 
             this.ontology = getContentManager().lookupOntology(LNTxOntology.ONTOLOGY_NAME);
         }
@@ -203,11 +213,10 @@ public class TransactionSenderAgent extends Agent {
 
                                 }
 
-                                //TODO CHECK IF SENT AND NO ERRORS
                                 //timing for the actual payment
                                 timer.setPaymentStartTime();
                                 //SAVE THE PAYMENT HASH
-                                rHashHex = lnClient.sendPayment(invoiceStr);
+                                rHashHex = lnClient.sendPayment(invoiceStr, feeLimitSat);
                                 timer.setPaymentEndTime();
 
                                 if(rHashHex.isEmpty()) {
@@ -220,6 +229,8 @@ public class TransactionSenderAgent extends Agent {
 
 
                                 if (invoiceValidAndPaid) {
+
+                                    feePaidSats = lnClient.getFeesPaid(rHashHex);
 
                                     //create reply
                                     ACLMessage receivedPaymentQueryMsg = msgIn.createReply();
@@ -276,7 +287,7 @@ public class TransactionSenderAgent extends Agent {
                                 state = State.SUCCESS;
                                 timer.setEndTime();
                                 myLogger.log(Logger.INFO, "SENDER: SUCCESS, PAYMENT SENT AND RECEPTION CONFIRMED");
-                                myLogger.log(Logger.INFO, "The timing for the whole protocol: "+timer.getTotalTime()+"ms. The timing for only the payment: "+timer.getPaymentTime()+"ms");
+                                myLogger.log(Logger.INFO, "The timing for the whole protocol: "+timer.getTotalTime()+"ms. The timing for only the payment: "+timer.getPaymentTime()+"ms. Fees paid: "+feePaidSats);
                             } else {
                                 state = State.FAILURE;
                             }
