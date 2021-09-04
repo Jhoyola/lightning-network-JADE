@@ -4,13 +4,8 @@ import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
-import jade.util.Logger;
 import util.ProductPrice;
-
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.util.ArrayList;
-import java.util.Scanner;
 
 public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
 

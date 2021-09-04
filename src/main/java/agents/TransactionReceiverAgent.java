@@ -1,6 +1,5 @@
 package agents;
 
-
 import jade.content.Predicate;
 import jade.content.abs.AbsPredicate;
 import jade.content.lang.Codec;
@@ -64,7 +63,11 @@ public class TransactionReceiverAgent extends Agent{
     }
 
     protected void setLNHost(String host, int port, String certPath, String macaroonPath) {
-        lnClient = new LNgrpcClient(host, port, certPath, macaroonPath);
+        try {
+            lnClient = new LNgrpcClient(host, port, certPath, macaroonPath);
+        } catch (LightningNetworkException e) {
+            myLogger.log(Logger.SEVERE, "Receiver agent: " + e.getMessage());
+        }
     }
 
     protected void addProductToCatalog(String prodId, ArrayList<ProductPrice> prices) {
@@ -129,6 +132,7 @@ public class TransactionReceiverAgent extends Agent{
                         //By default accept the proposal
                         //Set to false if any validation fails
                         boolean acceptProposal = true;
+                        String rejectionReason = "";
 
                         //TODO: RAJOITA MONTAKO KERTAA RETRY SAMALTA AGENTILTA
 
@@ -136,27 +140,24 @@ public class TransactionReceiverAgent extends Agent{
 
                             //validate the initiation message
                             if (msgIn.getConversationId().isEmpty()) {
-                                myLogger.log(Logger.WARNING, "Receiver Agent: Initiation message doesn't have a conversation id!");
+                                rejectionReason += "Initiation message doesn't have a conversation id!\n";
                                 acceptProposal = false;
-                                //TODO: PALAUTA SYY MIKSI REJECT
                             }
 
                             Action contentAction = (Action)myAgent.getContentManager().extractContent(msgIn);
                             AcceptPaymentProposalAndCreateLNInvoice acceptPaymentProposalAndCreateLNInvoice = (AcceptPaymentProposalAndCreateLNInvoice) contentAction.getAction();
 
                             if(!(acceptPaymentProposalAndCreateLNInvoice instanceof AcceptPaymentProposalAndCreateLNInvoice)) {
-                                myLogger.log(Logger.WARNING, "Receiver Agent: Initiation message doesn't have valid content!");
+                                rejectionReason += "Initiation message doesn't have valid content!\n";
                                 acceptProposal = false;
-                                //TODO: PALAUTA SYY MIKSI REJECT
                             }
 
                             receivedPaymentProposal = acceptPaymentProposalAndCreateLNInvoice.getPaymentProposal();
 
                             //validate that the product is allowed
                             if (!productCatalog.hasProductWithPrice(receivedPaymentProposal.getProdid(),receivedPaymentProposal.getCurrencyvalue(),receivedPaymentProposal.getCurrency())) {
-                                myLogger.log(Logger.WARNING, "Receiver Agent: Product or price not accepted!");
+                                rejectionReason += "Product or price not accepted!\n";
                                 acceptProposal = false;
-                                //TODO: PALAUTA SYY MIKSI REJECT
                             }
 
                             //validate that the satoshis price matches to the proposed value in traditional currency
@@ -170,16 +171,14 @@ public class TransactionReceiverAgent extends Agent{
                                             ", relative difference: "+ satsValueDeviation);
 
                             if(satsValueDeviation > priceTolerance) {
-                                myLogger.log(Logger.WARNING, "Receiver Agent: Satoshi values don't match, deviation: "+satsValueDeviation);
+                                rejectionReason += "Satoshi values don't match, deviation: "+satsValueDeviation+"\n";
                                 acceptProposal = false;
-                                //TODO: PALAUTA SYY MIKSI REJECT (too big value deviation)
                             }
 
                             if(lnClient.getReceivableBalance() < proposedSatsValue) {
                                 //too little incoming ln balance
-                                myLogger.log(Logger.WARNING, "Receiver Agent: too little incoming channel balance.)");
+                                rejectionReason += "Too little incoming channel balance.\n";
                                 acceptProposal = false;
-                                //TODO: PALAUTA SYY MIKSI REJECT (too little incoming channel balance)
                             }
 
                             if (acceptProposal) {
@@ -219,19 +218,17 @@ public class TransactionReceiverAgent extends Agent{
                                 setMessageTemplate(new int[]{ACLMessage.QUERY_IF, ACLMessage.FAILURE}, accept.getReplyWith());
                                 state = State.PROPOSAL_ACCEPTED;
                             } else {
-                                sendRejectionOfProposal(msgIn, "TODO TÄHÄN REJECT VIESTI");
+                                myLogger.log(Logger.WARNING, "Receiver Agent: rejecting payment proposal:\n"+rejectionReason);
+                                sendRejectionOfProposal(msgIn, rejectionReason);
                             }
 
                         }
                         catch (Exception e){
-                            //TODO: ERI VIRHEITÄ ERI EXCEPTIONEIDEN MUKAAN
-                            myLogger.log(Logger.WARNING, "Rejected proposal because of exception.");
-                            sendRejectionOfProposal(msgIn, "TODO TÄHÄN REJECT VIESTI");
-                            e.printStackTrace();
+                            myLogger.log(Logger.WARNING, "Receiver Agent: rejecting payment proposal because of exception:\n"+e.getMessage());
+                            sendRejectionOfProposal(msgIn, e.getMessage());
+                            //e.printStackTrace();
                             initializeBehaviour();
                         }
-
-
                     } else {
                         block();
                     }
@@ -243,15 +240,10 @@ public class TransactionReceiverAgent extends Agent{
                     if (msgIn != null) {
                         try {
 
-                            //default false
-                            boolean paymentReceived = false;
-
                             //Counterparty couldn't make the payment
                             if(msgIn.getPerformative() == ACLMessage.FAILURE) {
                                 //failure: payment is not paid
-                                //TODO: FAILURE
-                                state = State.FAILURE;
-                                break; //quit the action
+                                throw new RuntimeException("The payment was not made");
                             }
 
                             Action contentAction = (Action)myAgent.getContentManager().extractContent(msgIn);
@@ -260,49 +252,37 @@ public class TransactionReceiverAgent extends Agent{
 
                             //check that payment hashes (rHashes) correspond
                             if (!senderPaymentHash.equals(rHashHex)) {
-                                myLogger.log(Logger.WARNING, "The payment hash does not correspond to the invoice.");
-                                //TODO: FAILURE
-                                state = State.FAILURE;
-                                break; //quit the action
+                                throw new RuntimeException("The payment hash does not correspond to the invoice.");
                             }
 
                             long receivedAmount = lnClient.amountOfPaymentReceived(senderPaymentHash);
                             int proposedAmount = receivedPaymentProposal.getSatsvalue();
 
-                            //check that the amount received corresponds to the proposed amount
-                            if (receivedAmount >= proposedAmount) {
-                                paymentReceived = true;
-
-                                if(receivedAmount > proposedAmount) {
-                                    //received more than required
-                                    myLogger.log(Logger.INFO, "Received "+String.valueOf(receivedAmount)+", instead of "+String.valueOf(proposedAmount));
-                                }
+                            //check if the amount received is bigger or smaller than the proposed amount
+                            //the amounts should be exactly equal
+                            if (receivedAmount < proposedAmount) {
+                                throw new RuntimeException("Received amount is less than the expected amount.");
+                            } else if (receivedAmount > proposedAmount) {
+                                //received more than required
+                                myLogger.log(Logger.INFO, "Received "+String.valueOf(receivedAmount)+", instead of "+String.valueOf(proposedAmount));
                             }
 
-                            if (paymentReceived) {
+                            //reply true
+                            ACLMessage informTrue = msgIn.createReply();
+                            informTrue.setPerformative(ACLMessage.INFORM);
 
-                                //reply true
-                                ACLMessage informTrue = msgIn.createReply();
-                                informTrue.setPerformative(ACLMessage.INFORM);
+                            Predicate responseTrue = new AbsPredicate(SL0Vocabulary.TRUE_PROPOSITION);
+                            myAgent.getContentManager().fillContent(informTrue, responseTrue);
 
-                                Predicate responseTrue = new AbsPredicate(SL0Vocabulary.TRUE_PROPOSITION);
-                                myAgent.getContentManager().fillContent(informTrue, responseTrue);
+                            myAgent.send(informTrue);
+                            state = State.SUCCESS;
+                            myLogger.log(Logger.INFO, "RECEIVER: SUCCESS, RECEIVED "+String.valueOf(receivedAmount)+" sats");
 
-                                myAgent.send(informTrue);
-                                state = State.SUCCESS;
-                                myLogger.log(Logger.INFO, "RECEIVER: SUCCESS, RECEIVED "+String.valueOf(receivedAmount)+" sats");
-
-                            } else {
-                                //TODO: FAILURE
-                                state = State.FAILURE;
-                            }
-
-                        } catch (Codec.CodecException e) {
-                            e.printStackTrace();
-                        } catch (OntologyException e) {
-                            e.printStackTrace();
+                        } catch (Exception e) {
+                            //e.printStackTrace();
+                            myLogger.log(Logger.SEVERE, "Receiver agent: "+e.getMessage());
+                            state = State.FAILURE;
                         }
-
                     }
                     break;
 
@@ -312,7 +292,7 @@ public class TransactionReceiverAgent extends Agent{
         public boolean done() {
 
             if (state == State.FAILURE) {
-                myLogger.log(Logger.WARNING, "Transaction failed.");
+                myLogger.log(Logger.SEVERE, "Receiver agent: Transaction failed.");
 
                 //quit behaviour if not perpetual
                 if(!perpetualOperation) {
@@ -340,7 +320,8 @@ public class TransactionReceiverAgent extends Agent{
 
         private void sendRejectionOfProposal (ACLMessage msgIn, String reason) {
             //Reject the proposal
-            //TODO: respond with a formal rejection: why was rejected
+
+            //Possible improvement: respond with a structured rejection
 
             ACLMessage reject = msgIn.createReply();
             reject.setPerformative(ACLMessage.REJECT_PROPOSAL);
@@ -356,9 +337,7 @@ public class TransactionReceiverAgent extends Agent{
             try {
                 myAgent.getContentManager().fillContent(reject, paymentProposalRejected);
                 myAgent.send(reject);
-            } catch (Codec.CodecException e) {
-                e.printStackTrace();
-            } catch (OntologyException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
 

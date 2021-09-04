@@ -1,6 +1,5 @@
 package agents;
 
-
 import jade.content.lang.Codec;
 import jade.content.lang.sl.SLCodec;
 import jade.content.onto.Ontology;
@@ -56,7 +55,11 @@ public class TransactionSenderAgent extends Agent {
     }
 
     protected void setLNHost(String host, int port, String certPath, String macaroonPath) {
-        lnClient = new LNgrpcClient(host, port, certPath, macaroonPath);
+        try {
+            lnClient = new LNgrpcClient(host, port, certPath, macaroonPath);
+        } catch (LightningNetworkException e) {
+            myLogger.log(Logger.SEVERE, "Sender Agent: " + e.getMessage());
+        }
     }
 
     //set fee limit in satoshis
@@ -165,7 +168,6 @@ public class TransactionSenderAgent extends Agent {
                         acceptPaymentProposalAction.setActor(receiverAgent);
 
                         myAgent.getContentManager().fillContent(propose, acceptPaymentProposalAction);
-
                         myAgent.send(propose);
 
                         //set template for reply
@@ -174,7 +176,8 @@ public class TransactionSenderAgent extends Agent {
                         state = State.PROPOSED;
 
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        myLogger.log(Logger.WARNING, "Sender Agent: "+e.getMessage());
+                        //e.printStackTrace();
 
                         //add to retries if sending initiation fails
                         retries += 1;
@@ -189,9 +192,7 @@ public class TransactionSenderAgent extends Agent {
                             PaymentProposalAccepted proposalReply = (PaymentProposalAccepted) myAgent.getContentManager().extractContent(msgIn);
 
                             if (proposalReply.isAccepted()) {
-
-                                //by default not paid
-                                boolean invoiceValidAndPaid = false;
+                                //receiver accepted the payment proposal
 
                                 //Get the lightning network encoded invoice
                                 String invoiceStr = proposalReply.getLnInvoice().getInvoicestr();
@@ -204,13 +205,8 @@ public class TransactionSenderAgent extends Agent {
                                         paymentProposal.getCurrencyvalue(),
                                         paymentProposal.getCurrency());
 
-
                                 if(!invoiceOk) {
-
-                                    //TODO: KUMMALLA TAVALLA ERRORHANDLING (boolean vai throw!?)
-                                    invoiceValidAndPaid = false;
                                     throw new RuntimeException("The invoice is not what was proposed.");
-
                                 }
 
                                 //timing for the actual payment
@@ -220,56 +216,47 @@ public class TransactionSenderAgent extends Agent {
                                 timer.setPaymentEndTime();
 
                                 if(rHashHex.isEmpty()) {
-                                    //TODO: KUMMALLA TAVALLA ERRORHANDLING (boolean vai throw!?)
-                                    invoiceValidAndPaid = false;
                                     throw new RuntimeException("Paying the invoice failed.");
-                                } else {
-                                    invoiceValidAndPaid = true;
                                 }
 
+                                //no errors thrown: invoice ok and paid
 
-                                if (invoiceValidAndPaid) {
+                                feePaidSats = lnClient.getFeesPaid(rHashHex);
 
-                                    feePaidSats = lnClient.getFeesPaid(rHashHex);
+                                //create reply
+                                ACLMessage receivedPaymentQueryMsg = msgIn.createReply();
+                                receivedPaymentQueryMsg.setPerformative(ACLMessage.QUERY_IF);
 
-                                    //create reply
-                                    ACLMessage receivedPaymentQueryMsg = msgIn.createReply();
-                                    receivedPaymentQueryMsg.setPerformative(ACLMessage.QUERY_IF);
+                                ReceivedPaymentQuery invoiceQuery = new ReceivedPaymentQuery();
+                                invoiceQuery.setPaymentHash(rHashHex);
 
-                                    ReceivedPaymentQuery invoiceQuery = new ReceivedPaymentQuery();
-                                    invoiceQuery.setPaymentHash(rHashHex);
+                                Action respondIsPaymentReceivedAction = new Action();
+                                respondIsPaymentReceivedAction.setAction(invoiceQuery);
+                                respondIsPaymentReceivedAction.setActor(receiverAgent);
 
-                                    Action respondIsPaymentReceivedAction = new Action();
-                                    respondIsPaymentReceivedAction.setAction(invoiceQuery);
-                                    respondIsPaymentReceivedAction.setActor(receiverAgent);
+                                myAgent.getContentManager().fillContent(receivedPaymentQueryMsg, respondIsPaymentReceivedAction);
 
-                                    myAgent.getContentManager().fillContent(receivedPaymentQueryMsg, respondIsPaymentReceivedAction);
+                                myAgent.send(receivedPaymentQueryMsg);
 
-                                    myAgent.send(receivedPaymentQueryMsg);
-
-                                    state = State.PAID;
-                                    setMessageTemplate(new int[]{ACLMessage.INFORM}, receivedPaymentQueryMsg.getReplyWith());
-
-                                } else {
-                                    //reply failure
-                                    state = State.FAILURE;
-                                    ACLMessage failureMsg = msgIn.createReply();
-                                    failureMsg.setPerformative(ACLMessage.FAILURE);
-                                    myAgent.send(failureMsg);
-                                }
+                                state = State.PAID;
+                                setMessageTemplate(new int[]{ACLMessage.INFORM}, receivedPaymentQueryMsg.getReplyWith());
 
                             } else {
                                 //proposal rejected, naively retry
                                 state = State.INITIAL;
                                 retries += 1;
+
+                                //possible improvement: react to different rejections differently
                             }
                         }catch (Exception e) {
-                            //TODO: BETTER ERRORS
-                            myLogger.log(Logger.WARNING, "Sender Agent: Error in receiving response to proposal.");
-                            e.printStackTrace();
+                            myLogger.log(Logger.SEVERE, "Sender Agent: "+e.getMessage());
+                            //e.printStackTrace();
+
+                            ACLMessage failureMsg = msgIn.createReply();
+                            failureMsg.setPerformative(ACLMessage.FAILURE);
+                            myAgent.send(failureMsg);
                             state = State.FAILURE; //FAILED
                         }
-
                     }else{
                         block();
                     }
@@ -300,7 +287,6 @@ public class TransactionSenderAgent extends Agent {
                     }
                     break;
             }
-
         }
 
         public boolean done() {
@@ -312,7 +298,7 @@ public class TransactionSenderAgent extends Agent {
 
             //end
             if (state == State.FAILURE) {
-                myLogger.log(Logger.WARNING, "Transaction failed.");
+                myLogger.log(Logger.SEVERE, "Sender Agent: Transaction failed.");
                 return true;
             }
             if (state == State.SUCCESS) {

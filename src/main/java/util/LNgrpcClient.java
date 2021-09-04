@@ -56,7 +56,7 @@ public class LNgrpcClient {
 
     private boolean useMock;
 
-    public LNgrpcClient(String host, int port, String certPath, String macaroonPath) {
+    public LNgrpcClient(String host, int port, String certPath, String macaroonPath) throws LightningNetworkException {
 
         //leave host empty to use mock version
         if(host.isEmpty()) {
@@ -89,13 +89,9 @@ public class LNgrpcClient {
                     .newBlockingStub(channel)
                     .withCallCredentials(new MacaroonCallCredential(macaroon));
 
-        } catch (IOException e) {
-            //TODO Handle exception better
-            e.printStackTrace();
-            stub_ = null;
         } catch (Exception e) {
-            e.printStackTrace();
-            stub_ = null;
+            //e.printStackTrace();
+            throw new LightningNetworkException(e.getMessage());
         }
         stub = stub_;
     }
@@ -136,23 +132,27 @@ public class LNgrpcClient {
             return new String[]{"mock_paymentrequest", "mock_rhash"};
         }
 
-        Rpc.Invoice.Builder invoiceBuilder = Rpc.Invoice.newBuilder();
-        invoiceBuilder.setValue(amount); //value in satoshis
+        try {
+            Rpc.Invoice.Builder invoiceBuilder = Rpc.Invoice.newBuilder();
+            invoiceBuilder.setValue(amount); //value in satoshis
 
-        //create the memo of the invoice
-        invoiceBuilder.setMemo(createJsonMemo(convId, prodId, amountCurr, currency));
+            //create the memo of the invoice
+            invoiceBuilder.setMemo(createJsonMemo(convId, prodId, amountCurr, currency));
 
-        Rpc.Invoice i = invoiceBuilder.build();
-        Rpc.AddInvoiceResponse response = stub.addInvoice(i);
+            Rpc.Invoice i = invoiceBuilder.build();
+            Rpc.AddInvoiceResponse response = stub.addInvoice(i);
 
-        if(!response.getInitializationErrorString().isEmpty()) {
-            throw new LightningNetworkException(response.getInitializationErrorString());
+            if(!response.getInitializationErrorString().isEmpty()) {
+                throw new LightningNetworkException(response.getInitializationErrorString());
+            }
+
+            String rHashHex = String.valueOf(Hex.encodeHex(response.getRHash().toByteArray()));
+
+            //return 2 strings: payment request [0] and rHash [1]
+            return new String[]{response.getPaymentRequest(), rHashHex};
+        } catch (Exception e) {
+            throw new LightningNetworkException(e.getMessage());
         }
-
-        String rHashHex = String.valueOf(Hex.encodeHex(response.getRHash().toByteArray()));
-
-        //return 2 strings: payment request [0] and rHash [1]
-        return new String[]{response.getPaymentRequest(), rHashHex};
     }
 
     public boolean checkInvoiceStrCorresponds(String invoiceStr, int satsValue, String convId, String prodId, double amountCurr, String currency) {
@@ -198,18 +198,23 @@ public class LNgrpcClient {
             return "mock_rhash";
         }
 
-        //Also would have a possibility of percentual fee limit
-        Rpc.FeeLimit feeLimit = Rpc.FeeLimit.newBuilder().setFixed(feeLimitSat).build();
+        try {
+            //Also would have a possibility of percentual fee limit
+            Rpc.FeeLimit feeLimit = Rpc.FeeLimit.newBuilder().setFixed(feeLimitSat).build();
 
-        Rpc.SendResponse response = stub.sendPaymentSync(Rpc.SendRequest.newBuilder().setPaymentRequest(invoice).setFeeLimit(feeLimit).build());
+            Rpc.SendResponse response = stub.sendPaymentSync(Rpc.SendRequest.newBuilder().setPaymentRequest(invoice).setFeeLimit(feeLimit).build());
 
-        //throw if has any errors
-        if(!response.getPaymentError().isEmpty()) {
-            throw new LightningNetworkException(response.getPaymentError());
+            //throw if has any errors
+            if(!response.getPaymentError().isEmpty()) {
+                throw new LightningNetworkException(response.getPaymentError());
+            }
+
+            //return paymentHash (equivalent of RHash in the invoice!)
+            return String.valueOf(Hex.encodeHex(response.getPaymentHash().toByteArray()));
+
+        } catch (Exception e) {
+            throw new LightningNetworkException(e.getMessage());
         }
-
-        //return paymentHash (equivalent of RHash in the invoice!)
-        return String.valueOf(Hex.encodeHex(response.getPaymentHash().toByteArray()));
     }
 
     public long amountOfPaymentReceived(String rHashHex) {
@@ -250,12 +255,11 @@ public class LNgrpcClient {
                 }
             }
 
-            throw new LightningNetworkException("Payment not found in the last 5 payments");
+            throw new LightningNetworkException("Payment not found in the last 5 payments. Cannot calculate fees.");
 
         } catch (Exception e) {
             throw new LightningNetworkException(e.getMessage());
         }
-
     }
 
 }
