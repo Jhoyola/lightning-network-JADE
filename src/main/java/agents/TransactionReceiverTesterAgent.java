@@ -20,7 +20,7 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
         enableDebugLogging();
 
         //simnet
-        setLNHost("192.168.1.83", 10002, "src/main/resources/tls.cert", "src/main/resources/simnet_b_admin.macaroon");
+        setLNHost("192.168.1.83", 10002, "src/main/resources/tls_simnet.cert", "src/main/resources/simnet_b_admin.macaroon");
 
         //mainnet
         //setLNHost("192.168.1.83", 10003, "src/main/resources/tls.cert", "src/main/resources/mainnet_a_admin.macaroon");
