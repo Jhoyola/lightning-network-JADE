@@ -277,7 +277,7 @@ public class TransactionSenderAgent extends Agent {
                                 state = State.SUCCESS;
                                 timer.setEndTime();
                                 myLogger.log(Logger.INFO, "SENDER: SUCCESS, PAYMENT SENT AND RECEPTION CONFIRMED");
-                                myLogger.log(Logger.INFO, "The timing for the whole protocol: "+timer.getTotalTime()+"ms. The timing for only the payment: "+timer.getPaymentTime()+"ms. Fees paid: "+feePaidSats);
+                                myLogger.log(Logger.INFO, "The timing for the whole protocol: "+timer.getTotalTime()+"ms. The timing for only the payment: "+timer.getPaymentTime()+"ms. Fees paid: "+feePaidSats+" sats");
                             } else {
                                 state = State.FAILURE;
                             }
