@@ -7,10 +7,7 @@ public class PaymentProposalAccepted implements Predicate {
     private boolean accepted;
     private PaymentProposal paymentProposal;
     private LNInvoice lnInvoice;
-
-
-    //TODO: ADD REASON FOR REJECTION
-
+    private String reasonForRejection;
 
     public void setPaymentProposal(PaymentProposal paymentProposal) {
         this.paymentProposal = paymentProposal;
@@ -38,5 +35,15 @@ public class PaymentProposalAccepted implements Predicate {
         return accepted;
     }
 
+    public void setReasonForRejection(String reasonForRejection) {
+        this.reasonForRejection = reasonForRejection;
+    }
 
+    @Slot(mandatory = false)
+    public String getReasonForRejection() {
+        if(reasonForRejection.isEmpty()) {
+            return "";
+        }
+        return reasonForRejection;
+    }
 }

@@ -211,7 +211,7 @@ public class TransactionSenderAgent extends Agent {
 
                                 //timing for the actual payment
                                 timer.setPaymentStartTime();
-                                //SAVE THE PAYMENT HASH
+                                //save the payment hash of the paid invoice
                                 rHashHex = lnClient.sendPayment(invoiceStr, feeLimitSat);
                                 timer.setPaymentEndTime();
 
@@ -242,6 +242,9 @@ public class TransactionSenderAgent extends Agent {
                                 setMessageTemplate(new int[]{ACLMessage.INFORM}, receivedPaymentQueryMsg.getReplyWith());
 
                             } else {
+
+                                myLogger.log(Logger.WARNING, "Sender Agent: Proposal rejected because of: "+proposalReply.getReasonForRejection()+" Retrying if retry attempts remaining.");
+
                                 //proposal rejected, naively retry
                                 state = State.INITIAL;
                                 retries += 1;

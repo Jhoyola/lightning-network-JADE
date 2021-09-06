@@ -131,7 +131,7 @@ public class TransactionReceiverAgent extends Agent{
 
                             //validate the initiation message
                             if (msgIn.getConversationId().isEmpty()) {
-                                rejectionReason += "Initiation message doesn't have a conversation id!\n";
+                                rejectionReason += "\nInitiation message doesn't have a conversation id!";
                                 acceptProposal = false;
                             }
 
@@ -139,7 +139,7 @@ public class TransactionReceiverAgent extends Agent{
                             AcceptPaymentProposalAndCreateLNInvoice acceptPaymentProposalAndCreateLNInvoice = (AcceptPaymentProposalAndCreateLNInvoice) contentAction.getAction();
 
                             if(acceptPaymentProposalAndCreateLNInvoice == null) {
-                                rejectionReason += "Initiation message doesn't have valid content!\n";
+                                rejectionReason += "\nInitiation message doesn't have valid content!";
                                 acceptProposal = false;
                             }
 
@@ -148,7 +148,7 @@ public class TransactionReceiverAgent extends Agent{
                             //check if the product and price are accepted
                             //isProposalAccepted function can be overwritten to set the conditions in the child class
                             if(!isProposalAccepted(receivedPaymentProposal)) {
-                                rejectionReason += "Product or price not accepted!\n";
+                                rejectionReason += "\nProduct or price not accepted!";
                                 acceptProposal = false;
                             }
 
@@ -163,13 +163,13 @@ public class TransactionReceiverAgent extends Agent{
                                             ", relative difference: "+ satsValueDeviation);
 
                             if(satsValueDeviation > priceTolerance) {
-                                rejectionReason += "Satoshi values don't match, deviation: "+satsValueDeviation+"\n";
+                                rejectionReason += "\nSatoshi values don't match, deviation: "+satsValueDeviation;
                                 acceptProposal = false;
                             }
 
                             if(lnClient.getReceivableBalance() < proposedSatsValue) {
                                 //too little incoming ln balance
-                                rejectionReason += "Too little incoming channel balance.\n";
+                                rejectionReason += "\nToo little incoming channel balance.";
                                 acceptProposal = false;
                             }
 
@@ -202,6 +202,7 @@ public class TransactionReceiverAgent extends Agent{
                                 paymentProposalAccepted.setAccepted(true);
                                 paymentProposalAccepted.setLnInvoice(invoice);
                                 paymentProposalAccepted.setPaymentProposal(receivedPaymentProposal);
+                                paymentProposalAccepted.setReasonForRejection("");
 
                                 myAgent.getContentManager().fillContent(accept, paymentProposalAccepted);
 
@@ -210,7 +211,7 @@ public class TransactionReceiverAgent extends Agent{
                                 setMessageTemplate(new int[]{ACLMessage.QUERY_IF, ACLMessage.FAILURE}, accept.getReplyWith());
                                 state = State.PROPOSAL_ACCEPTED;
                             } else {
-                                myLogger.log(Logger.WARNING, "Receiver Agent: rejecting payment proposal:\n"+rejectionReason);
+                                myLogger.log(Logger.WARNING, "Receiver Agent: rejecting payment proposal:"+rejectionReason);
                                 sendRejectionOfProposal(msgIn, rejectionReason);
                             }
 
@@ -321,6 +322,7 @@ public class TransactionReceiverAgent extends Agent{
             PaymentProposalAccepted paymentProposalRejected = new PaymentProposalAccepted();
             paymentProposalRejected.setAccepted(false);
             paymentProposalRejected.setPaymentProposal(receivedPaymentProposal);
+            paymentProposalRejected.setReasonForRejection(reason);
             //add empty invoice
             LNInvoice invoice = new LNInvoice();
             invoice.setInvoicestr("");
