@@ -1,13 +1,16 @@
 package agents;
 
+import LNTxOntology.PaymentProposal;
 import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
-import util.ProductPrice;
-import java.util.ArrayList;
+import util.ListedProduct;
+import util.ProductCatalog;
 
 public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
+
+    private ProductCatalog productCatalog;
 
     protected void setup() {
         super.setup();
@@ -20,17 +23,20 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
         //mainnet
         //setLNHost("192.168.1.83", 10003, "src/main/resources/tls.cert", "src/main/resources/mainnet_a_admin.macaroon");
 
-        //ADD SOME PRODUCTS FOR TESTING
-        ArrayList<ProductPrice> prices = new ArrayList<ProductPrice>();
-        prices.add(new ProductPrice(0.05, "eur"));
-        prices.add(new ProductPrice(0.06, "usd"));
-        addProductToCatalog("prod_1", prices);
 
-        prices = new ArrayList<ProductPrice>();
-        prices.add(new ProductPrice(0.15, "eur"));
-        prices.add(new ProductPrice(0.7, "eur"));
-        prices.add(new ProductPrice(10000, "eur"));
-        addProductToCatalog("prod_2", prices);
+        //ADD SOME PRODUCTS FOR TESTING
+        productCatalog = new ProductCatalog();
+
+        ListedProduct p = new ListedProduct("prod_1");
+        p.addPrice(0.05, "eur");
+        p.addPrice(0.06, "usd");
+        productCatalog.addProduct(p);
+
+        p = new ListedProduct("prod_2");
+        p.addPrice(0.15, "eur");
+        p.addPrice(0.7, "eur");
+        p.addPrice(10000, "eur");
+        productCatalog.addProduct(p);
 
 
         // Registration with the DF for the initiation
@@ -49,5 +55,18 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
         }
 
     }
+
+    //set rules for accepting the proposal
+    protected boolean isProposalAccepted(PaymentProposal proposal) {
+        System.out.println("Checking if product found in catalog.");
+
+        //validate that the product is in the catalog
+        if (productCatalog.hasProductWithPrice(proposal.getProdid(),proposal.getCurrencyvalue(),proposal.getCurrency())) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
 
 }

@@ -13,7 +13,6 @@ import jade.domain.FIPANames;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.util.Logger;
-import java.util.ArrayList;
 import java.util.UUID;
 
 import LNTxOntology.*;
@@ -33,8 +32,6 @@ public class TransactionReceiverAgent extends Agent{
     private PriceAPIWrapper priceApi;
 
     private LNgrpcClient lnClient;
-
-    private ProductCatalog productCatalog;
 
     //Price tolerance: accepted relative deviation in bitcoin price (0-1)
     private double priceTolerance = 0.01; // 1 %
@@ -58,7 +55,6 @@ public class TransactionReceiverAgent extends Agent{
 
         //Use different price api than the sender to simulate realistic situation
         priceApi = new PriceAPIWrapper(new PriceAPICoindesk());
-        productCatalog = new ProductCatalog();
 
     }
 
@@ -68,17 +64,6 @@ public class TransactionReceiverAgent extends Agent{
         } catch (LightningNetworkException e) {
             myLogger.log(Logger.SEVERE, "Receiver agent: " + e.getMessage());
         }
-    }
-
-    protected void addProductToCatalog(String prodId, ArrayList<ProductPrice> prices) {
-
-        ListedProduct p = new ListedProduct(prodId);
-
-        for (int i = 0; i < prices.size(); i++) {
-            p.addPrice(prices.get(i).getPrice(), prices.get(i).getCurrency());
-        }
-
-        productCatalog.addProduct(p);
     }
 
     protected void setPriceTolerance(double tol) {
@@ -95,6 +80,12 @@ public class TransactionReceiverAgent extends Agent{
     protected void enableDebugLogging() {
         myLogger.setLevel(Logger.FINE);
         //TODO: NOT WORKING UNLESS LOGGER MANAGER IS ACTIVATED
+    }
+
+    protected boolean isProposalAccepted(PaymentProposal proposal) {
+        //this function can be overwritten to set rules for proposal acceptance
+        myLogger.log(Logger.INFO, "Receiver Agent: Using default isProposalAccepted function. All proposals are accepted.");
+        return true;
     }
 
     protected class TransactReceiveBehaviour extends Behaviour {
@@ -147,15 +138,16 @@ public class TransactionReceiverAgent extends Agent{
                             Action contentAction = (Action)myAgent.getContentManager().extractContent(msgIn);
                             AcceptPaymentProposalAndCreateLNInvoice acceptPaymentProposalAndCreateLNInvoice = (AcceptPaymentProposalAndCreateLNInvoice) contentAction.getAction();
 
-                            if(!(acceptPaymentProposalAndCreateLNInvoice instanceof AcceptPaymentProposalAndCreateLNInvoice)) {
+                            if(acceptPaymentProposalAndCreateLNInvoice == null) {
                                 rejectionReason += "Initiation message doesn't have valid content!\n";
                                 acceptProposal = false;
                             }
 
                             receivedPaymentProposal = acceptPaymentProposalAndCreateLNInvoice.getPaymentProposal();
 
-                            //validate that the product is allowed
-                            if (!productCatalog.hasProductWithPrice(receivedPaymentProposal.getProdid(),receivedPaymentProposal.getCurrencyvalue(),receivedPaymentProposal.getCurrency())) {
+                            //check if the product and price are accepted
+                            //isProposalAccepted function can be overwritten to set the conditions in the child class
+                            if(!isProposalAccepted(receivedPaymentProposal)) {
                                 rejectionReason += "Product or price not accepted!\n";
                                 acceptProposal = false;
                             }
