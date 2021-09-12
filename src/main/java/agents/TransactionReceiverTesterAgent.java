@@ -5,6 +5,7 @@ import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
+import util.CompletePayment;
 import util.ListedProduct;
 import util.ProductCatalog;
 
@@ -55,6 +56,16 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
             doDelete();
         }
 
+    }
+
+    protected void transactionComplete(CompletePayment payment) {
+        if(payment.isSuccess()) {
+            System.out.println("RECEIVER: SUCCESS");
+            System.out.println("Received: "+payment.getPaymentProposal().getAsStringForLogging());
+        } else {
+            System.out.println("Receiver Agent: TRANSACTION FAILED!");
+            System.out.println(payment.getFailureReason());
+        }
     }
 
     //set rules for accepting the proposal

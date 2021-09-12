@@ -13,6 +13,8 @@ import jade.domain.FIPANames;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.util.Logger;
+
+import java.util.ArrayList;
 import java.util.UUID;
 
 import LNTxOntology.*;
@@ -36,7 +38,11 @@ public class TransactionReceiverAgent extends Agent{
     //Price tolerance: accepted relative deviation in bitcoin price (0-1)
     private double priceTolerance = 0.01; // 1 %
 
+    protected ArrayList<CompletePayment> completePaymentsList;
+
     protected void setup() {
+
+        completePaymentsList = new ArrayList<CompletePayment>();
 
         //set logging level
         boolean debug = true;
@@ -82,10 +88,20 @@ public class TransactionReceiverAgent extends Agent{
         //TODO: NOT WORKING UNLESS LOGGER MANAGER IS ACTIVATED
     }
 
+    //this function can be overwritten to set rules for proposal acceptance
     protected boolean isProposalAccepted(PaymentProposal proposal) {
-        //this function can be overwritten to set rules for proposal acceptance
         myLogger.log(Logger.INFO, "Receiver Agent: Using default isProposalAccepted function. All proposals are accepted.");
         return true;
+    }
+
+    //this can be overwritten to invoke desired action after the payment completes
+    protected void transactionComplete(CompletePayment payment) {
+        if (payment.isSuccess()) {
+            myLogger.log(Logger.INFO, "Receiver Agent: Transaction success.");
+        } else {
+            myLogger.log(Logger.SEVERE, "Receiver Agent: Transaction failed.");
+            myLogger.log(Logger.SEVERE, payment.getFailureReason());
+        }
     }
 
     protected class TransactReceiveBehaviour extends Behaviour {
@@ -105,6 +121,8 @@ public class TransactionReceiverAgent extends Agent{
 
         //if false, stop after receiving one successful payment or failure
         private boolean perpetualOperation;
+
+        private String failureReason = "";
 
         protected TransactReceiveBehaviour(Agent a, boolean perpetual) {
             super(a);
@@ -269,11 +287,11 @@ public class TransactionReceiverAgent extends Agent{
 
                             myAgent.send(informTrue);
                             state = State.SUCCESS;
-                            myLogger.log(Logger.INFO, "RECEIVER: SUCCESS, RECEIVED "+String.valueOf(receivedAmount)+" sats");
 
                         } catch (Exception e) {
                             //e.printStackTrace();
                             myLogger.log(Logger.SEVERE, "Receiver agent: "+e.getMessage());
+                            failureReason = e.getMessage();
                             state = State.FAILURE;
                         }
                     }
@@ -285,7 +303,12 @@ public class TransactionReceiverAgent extends Agent{
         public boolean done() {
 
             if (state == State.FAILURE) {
-                myLogger.log(Logger.SEVERE, "Receiver agent: Transaction failed.");
+
+                //set fees to null as the receiver does not know how much fees was paid
+                CompletePayment p = new CompletePayment(CompletePayment.Role.RECEIVER, false, receivedPaymentProposal, rHashHex, convId, senderAgent, -1, null);
+                p.setFailureReason(failureReason);
+                completePaymentsList.add(p);
+                transactionComplete(p);
 
                 //quit behaviour if not perpetual
                 if(!perpetualOperation) {
@@ -297,6 +320,11 @@ public class TransactionReceiverAgent extends Agent{
             }
 
             if (state == State.SUCCESS) {
+
+                //set fees to null as the receiver does not know how much fees was paid
+                CompletePayment p = new CompletePayment(CompletePayment.Role.RECEIVER, true, receivedPaymentProposal, rHashHex, convId, senderAgent, -1, null);
+                completePaymentsList.add(p);
+                transactionComplete(p);
 
                 //quit behaviour if not perpetual
                 if(!perpetualOperation) {

@@ -13,6 +13,9 @@ import jade.domain.FIPANames;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 import jade.util.Logger;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import LNTxOntology.*;
@@ -39,7 +42,11 @@ public class TransactionSenderAgent extends Agent {
     //Maximum fees in sats for a single transaction
     private int feeLimitSat = 50;
 
+    protected ArrayList<CompletePayment> completePaymentsList;
+
     protected void setup() {
+
+        completePaymentsList = new ArrayList<CompletePayment>();
 
         // Register the codec for the SL0 language
         getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL0);
@@ -72,6 +79,15 @@ public class TransactionSenderAgent extends Agent {
         //TODO: NOT WORKING UNLESS LOGGER MANAGER IS ACTIVATED
     }
 
+    //this can be overwritten to invoke desired action after the payment completes
+    protected void transactionComplete(CompletePayment payment) {
+        if (payment.isSuccess()) {
+            myLogger.log(Logger.INFO, "Sender Agent: Transaction success.");
+        } else {
+            myLogger.log(Logger.SEVERE, "Sender Agent: Transaction failed.");
+            myLogger.log(Logger.SEVERE, payment.getFailureReason());
+        }
+    }
 
     protected class TransactSendBehaviour extends Behaviour {
 
@@ -100,6 +116,8 @@ public class TransactionSenderAgent extends Agent {
         private MessageTemplate replyTemplate;
 
         Ontology ontology;
+
+        private String failureReason = "";
 
 
         protected TransactSendBehaviour(Agent a, AID receiverAgent, String currency, double valCurr, String payId) {
@@ -252,6 +270,7 @@ public class TransactionSenderAgent extends Agent {
                                 //possible improvement: react to different rejections differently
                             }
                         }catch (Exception e) {
+                            failureReason = e.getMessage();
                             myLogger.log(Logger.SEVERE, "Sender Agent: "+e.getMessage());
                             //e.printStackTrace();
 
@@ -276,8 +295,6 @@ public class TransactionSenderAgent extends Agent {
                             if(informClass.equals(trueClass)) {
                                 state = State.SUCCESS;
                                 timer.setEndTime();
-                                myLogger.log(Logger.INFO, "SENDER: SUCCESS, PAYMENT SENT AND RECEPTION CONFIRMED");
-                                myLogger.log(Logger.INFO, "The timing for the whole protocol: "+timer.getTotalTime()+"ms. The timing for only the payment: "+timer.getPaymentTime()+"ms. Fees paid: "+feePaidSats+" sats");
                             } else {
                                 state = State.FAILURE;
                             }
@@ -301,10 +318,16 @@ public class TransactionSenderAgent extends Agent {
 
             //end
             if (state == State.FAILURE) {
-                myLogger.log(Logger.SEVERE, "Sender Agent: Transaction failed.");
+                CompletePayment p = new CompletePayment(CompletePayment.Role.SENDER, false, paymentProposal, rHashHex, convId, receiverAgent, feePaidSats, timer);
+                p.setFailureReason(failureReason);
+                completePaymentsList.add(p);
+                transactionComplete(p);
                 return true;
             }
             if (state == State.SUCCESS) {
+                CompletePayment p = new CompletePayment(CompletePayment.Role.SENDER, true, paymentProposal, rHashHex, convId, receiverAgent, feePaidSats, timer);
+                completePaymentsList.add(p);
+                transactionComplete(p);
                 return true;
             }
 

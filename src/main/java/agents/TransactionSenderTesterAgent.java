@@ -7,6 +7,8 @@ import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
+import jade.util.Logger;
+import util.CompletePayment;
 
 public class TransactionSenderTesterAgent extends TransactionSenderAgent{
 
@@ -22,6 +24,19 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
         //setLNHost("192.168.1.83", 10004, "src/main/resources/tls.cert", "src/main/resources/mainnet_b_admin.macaroon");
 
         addBehaviour(new LoopTransactSendBehaviour(this));
+    }
+
+    protected void transactionComplete(CompletePayment payment) {
+        if(payment.isSuccess()) {
+            System.out.println("SENDER: SUCCESS");
+            System.out.println("Sent: "+payment.getPaymentProposal().getAsStringForLogging());
+            System.out.println("The timing for the whole protocol: "+payment.getTimer().getTotalTime()+" ms");
+            System.out.println("The timing for only the payment: "+payment.getTimer().getPaymentTime()+" ms");
+            System.out.println("Fees paid: "+payment.getFeesPaid()+" sats");
+        } else {
+            System.out.println("Sender Agent: TRANSACTION FAILED!");
+            System.out.println(payment.getFailureReason());
+        }
     }
 
     //Find receivers and start protocol as sender
