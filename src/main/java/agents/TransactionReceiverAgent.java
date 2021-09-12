@@ -145,16 +145,16 @@ public class TransactionReceiverAgent extends Agent{
 
                             receivedPaymentProposal = acceptPaymentProposalAndCreateLNInvoice.getPaymentProposal();
 
-                            //check if the product and price are accepted
+                            //check if the payment id and price are accepted
                             //isProposalAccepted function can be overwritten to set the conditions in the child class
                             if(!isProposalAccepted(receivedPaymentProposal)) {
-                                rejectionReason += "\nProduct or price not accepted!";
+                                rejectionReason += "\nPayment id or price not accepted!";
                                 acceptProposal = false;
                             }
 
                             //validate that the satoshis price matches to the proposed value in traditional currency
-                            int fetchedSatsValue = priceApi.getSatsValue(receivedPaymentProposal.getCurrencyvalue(),receivedPaymentProposal.getCurrency());
-                            int proposedSatsValue = receivedPaymentProposal.getSatsvalue();
+                            int fetchedSatsValue = priceApi.getSatsValue(receivedPaymentProposal.getCurrencyValue(),receivedPaymentProposal.getCurrency());
+                            int proposedSatsValue = receivedPaymentProposal.getSatsValue();
                             double satsValueDeviation = Math.abs(((double)fetchedSatsValue)-((double)proposedSatsValue))/((double)fetchedSatsValue);
 
                             myLogger.log(Logger.FINE,
@@ -186,8 +186,8 @@ public class TransactionReceiverAgent extends Agent{
                                 String[] createdInvoiceTuple = lnClient.createInvoice(
                                         proposedSatsValue,
                                         convId.toString(),
-                                        receivedPaymentProposal.getProdid(),
-                                        receivedPaymentProposal.getCurrencyvalue(),
+                                        receivedPaymentProposal.getPayId(),
+                                        receivedPaymentProposal.getCurrencyValue(),
                                         receivedPaymentProposal.getCurrency()
                                 );
 
@@ -249,7 +249,7 @@ public class TransactionReceiverAgent extends Agent{
                             }
 
                             long receivedAmount = lnClient.amountOfPaymentReceived(senderPaymentHash);
-                            int proposedAmount = receivedPaymentProposal.getSatsvalue();
+                            int proposedAmount = receivedPaymentProposal.getSatsValue();
 
                             //check if the amount received is bigger or smaller than the proposed amount
                             //the amounts should be exactly equal

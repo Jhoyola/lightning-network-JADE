@@ -32,7 +32,7 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
         //TESTING VALUES FOR THE PROTOCOL
         String currency = "eur"; //base currency
         double valCurr = 0.05; //value in base currency
-        String prodID = "prod_1"; //product id for the receiver
+        String prodId = "prod_1"; //product id for the receiver
 
         public LoopTransactSendBehaviour(Agent a) {
             this.a = a;
@@ -74,7 +74,7 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
 
                 if(result.length > 0) {
                     AID receiver = result[0].getName();
-                    addBehaviour(new TransactSendBehaviour(a, receiver, currency, valCurr, prodID));
+                    addBehaviour(new TransactSendBehaviour(a, receiver, currency, valCurr, prodId));
                 } else {
                     System.out.println("Didn't find a receiver");
                 }

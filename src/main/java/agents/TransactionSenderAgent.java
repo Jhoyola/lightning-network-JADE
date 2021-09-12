@@ -102,7 +102,7 @@ public class TransactionSenderAgent extends Agent {
         Ontology ontology;
 
 
-        protected TransactSendBehaviour(Agent a, AID receiverAgent, String currency, double valCurr, String prodID) {
+        protected TransactSendBehaviour(Agent a, AID receiverAgent, String currency, double valCurr, String payId) {
 
             super(a);
 
@@ -116,8 +116,8 @@ public class TransactionSenderAgent extends Agent {
 
             paymentProposal = new PaymentProposal();
             paymentProposal.setCurrency(currency);
-            paymentProposal.setProdid(prodID);
-            paymentProposal.setCurrencyvalue(valCurr);
+            paymentProposal.setPayId(payId);
+            paymentProposal.setCurrencyValue(valCurr);
 
             this.convId = UUID.randomUUID(); //set the conversation id
 
@@ -138,7 +138,7 @@ public class TransactionSenderAgent extends Agent {
 
                     try {
 
-                        double currVal = paymentProposal.getCurrencyvalue();
+                        double currVal = paymentProposal.getCurrencyValue();
                         String currency = paymentProposal.getCurrency();
 
                         if (currVal < 0) {
@@ -148,10 +148,10 @@ public class TransactionSenderAgent extends Agent {
                         }
 
                         //Get the value converted to satoshis from the API. Cast to int, so satoshis are int value.
-                        paymentProposal.setSatsvalue(priceApi.getSatsValue(currVal,currency));
+                        paymentProposal.setSatsValue(priceApi.getSatsValue(currVal,currency));
 
                         //check that has enough balance to send on the ln node
-                        if (lnClient.getSendableBalance() < paymentProposal.getSatsvalue()) {
+                        if (lnClient.getSendableBalance() < paymentProposal.getSatsValue()) {
                             throw new RuntimeException("Not enough outgoing balance.");
                         }
 
@@ -199,10 +199,10 @@ public class TransactionSenderAgent extends Agent {
                                 //check that the ln invoice amount and memo corresponds to the payment proposal
                                 boolean invoiceOk = lnClient.checkInvoiceStrCorresponds(
                                         invoiceStr,
-                                        paymentProposal.getSatsvalue(),
+                                        paymentProposal.getSatsValue(),
                                         convId.toString(),
-                                        paymentProposal.getProdid(),
-                                        paymentProposal.getCurrencyvalue(),
+                                        paymentProposal.getPayId(),
+                                        paymentProposal.getCurrencyValue(),
                                         paymentProposal.getCurrency());
 
                                 if(!invoiceOk) {

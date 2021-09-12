@@ -8,8 +8,8 @@ import jade.content.Concept;
 public class TxValue implements Concept {
 
     private String currency;
-    private double currencyvalue;
-    private int satsvalue;
+    private double currencyValue;
+    private int satsValue;
 
 
     public String getCurrency() {
@@ -20,20 +20,20 @@ public class TxValue implements Concept {
         this.currency = currency;
     }
 
-    public double getCurrencyvalue() {
-        return currencyvalue;
+    public double getCurrencyValue() {
+        return currencyValue;
     }
 
-    public void setCurrencyvalue(double currencyvalue) {
-        this.currencyvalue = currencyvalue;
+    public void setCurrencyValue(double currencyValue) {
+        this.currencyValue = currencyValue;
     }
 
-    public int getSatsvalue() {
-        return satsvalue;
+    public int getSatsValue() {
+        return satsValue;
     }
 
-    public void setSatsvalue(int satsvalue) {
-        this.satsvalue = satsvalue;
+    public void setSatsValue(int satsValue) {
+        this.satsValue = satsValue;
     }
 
 }

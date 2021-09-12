@@ -100,11 +100,11 @@ public class LNgrpcClient {
         return stub.channelBalance(Rpc.ChannelBalanceRequest.getDefaultInstance());
     }
 
-    private String createJsonMemo(String convId, String prodId, double amountCurr, String currency) {
+    private String createJsonMemo(String convId, String payId, double amountCurr, String currency) {
 
         JSONObject jsonMemo = new JSONObject();
         jsonMemo.put("convId", convId);
-        jsonMemo.put("prodId", prodId);
+        jsonMemo.put("payId", payId);
         jsonMemo.put("amountCurr", amountCurr);
         jsonMemo.put("currency", currency);
 
@@ -127,7 +127,7 @@ public class LNgrpcClient {
         return getChannelBalance().getRemoteBalance().getSat();
     }
 
-    public String[] createInvoice(long amount, String convId, String prodId, double amountCurr, String currency) throws LightningNetworkException {
+    public String[] createInvoice(long amount, String convId, String payId, double amountCurr, String currency) throws LightningNetworkException {
         if(useMock) {
             return new String[]{"mock_paymentrequest", "mock_rhash"};
         }
@@ -137,7 +137,7 @@ public class LNgrpcClient {
             invoiceBuilder.setValue(amount); //value in satoshis
 
             //create the memo of the invoice
-            invoiceBuilder.setMemo(createJsonMemo(convId, prodId, amountCurr, currency));
+            invoiceBuilder.setMemo(createJsonMemo(convId, payId, amountCurr, currency));
 
             Rpc.Invoice i = invoiceBuilder.build();
             Rpc.AddInvoiceResponse response = stub.addInvoice(i);
@@ -155,7 +155,7 @@ public class LNgrpcClient {
         }
     }
 
-    public boolean checkInvoiceStrCorresponds(String invoiceStr, int satsValue, String convId, String prodId, double amountCurr, String currency) {
+    public boolean checkInvoiceStrCorresponds(String invoiceStr, int satsValue, String convId, String payId, double amountCurr, String currency) {
         if(useMock) {
             return true;
         }
@@ -175,7 +175,7 @@ public class LNgrpcClient {
             if(!memoJsonObj.get("convId").toString().equals(convId)) {
                 return false;
             }
-            if(!memoJsonObj.get("prodId").toString().equals(prodId)) {
+            if(!memoJsonObj.get("payId").toString().equals(payId)) {
                 return false;
             }
             if(Double.parseDouble(memoJsonObj.get("amountCurr").toString()) != amountCurr) {

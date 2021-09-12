@@ -4,20 +4,20 @@ package LNTxOntology;
 
 public class PaymentProposal extends TxValue {
 
-    private String prodid;
+    private String payId;
 
-    public String getProdid() {
-        return prodid;
+    public String getPayId() {
+        return payId;
     }
 
-    public void setProdid(String prodid) {
-        this.prodid = prodid;
+    public void setPayId(String payId) {
+        this.payId = payId;
     }
 
     public String getAsStringForLogging() {
-        return "Product id: "+getProdid()+
-                ", value: "+ getCurrencyvalue() +" "+getCurrency()+
-                ", satoshis: "+getSatsvalue();
+        return "Payment id: "+getPayId()+
+                ", value: "+ getCurrencyValue() +" "+getCurrency()+
+                ", satoshis: "+getSatsValue();
     }
 
 }

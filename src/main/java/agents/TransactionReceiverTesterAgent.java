@@ -25,6 +25,7 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
 
 
         //ADD SOME PRODUCTS FOR TESTING
+        //Use the "payment id" as product id
         productCatalog = new ProductCatalog();
 
         ListedProduct p = new ListedProduct("prod_1");
@@ -61,7 +62,8 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
         System.out.println("Checking if product found in catalog.");
 
         //validate that the product is in the catalog
-        if (productCatalog.hasProductWithPrice(proposal.getProdid(),proposal.getCurrencyvalue(),proposal.getCurrency())) {
+        //payment id:s correspond to product id:s in this test case
+        if (productCatalog.hasProductWithPrice(proposal.getPayId(),proposal.getCurrencyValue(),proposal.getCurrency())) {
             return true;
         } else {
             return false;
