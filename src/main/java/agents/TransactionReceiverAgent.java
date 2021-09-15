@@ -3,7 +3,7 @@ package agents;
 import jade.content.Predicate;
 import jade.content.abs.AbsPredicate;
 import jade.content.lang.Codec;
-import jade.content.lang.sl.SL0Vocabulary;
+import jade.content.lang.sl.SL1Vocabulary;
 import jade.content.lang.sl.SLCodec;
 import jade.content.onto.OntologyException;
 import jade.content.onto.basic.Action;
@@ -54,8 +54,8 @@ public class TransactionReceiverAgent extends Agent{
             myLogger.setLevel(Logger.INFO);
         }
 
-        // Register the codec for the SL0 language
-        getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL0);
+        // Register the codec for the SL1 language
+        getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL1);
         // Register the ontology used by this application
         getContentManager().registerOntology(LNTxOntology.getInstance());
 
@@ -257,9 +257,12 @@ public class TransactionReceiverAgent extends Agent{
                                 throw new RuntimeException("The payment was not made");
                             }
 
-                            Action contentAction = (Action)myAgent.getContentManager().extractContent(msgIn);
-                            ReceivedPaymentQuery query = (ReceivedPaymentQuery) contentAction.getAction();
-                            String senderPaymentHash = query.getPaymentHash();
+                            Predicate pred = (Predicate)myAgent.getContentManager().extractContent(msgIn);
+                            if (!(pred instanceof ReceivedPayment)) {
+                                throw new RuntimeException("The predicate is of wrong type("+pred.getClass().toString()+"). Should be query-if.");
+                            }
+                            ReceivedPayment receivedPayment = (ReceivedPayment)pred;
+                            String senderPaymentHash = receivedPayment.getPaymentHash();
 
                             //check that payment hashes (rHashes) correspond
                             if (!senderPaymentHash.equals(rHashHex)) {
@@ -281,18 +284,31 @@ public class TransactionReceiverAgent extends Agent{
                             //reply true
                             ACLMessage informTrue = msgIn.createReply();
                             informTrue.setPerformative(ACLMessage.INFORM);
-
-                            Predicate responseTrue = new AbsPredicate(SL0Vocabulary.TRUE_PROPOSITION);
-                            myAgent.getContentManager().fillContent(informTrue, responseTrue);
-
+                            myAgent.getContentManager().fillContent(informTrue, receivedPayment);
                             myAgent.send(informTrue);
                             state = State.SUCCESS;
 
                         } catch (Exception e) {
-                            //e.printStackTrace();
+
                             myLogger.log(Logger.SEVERE, "Receiver agent: "+e.getMessage());
                             failureReason = e.getMessage();
                             state = State.FAILURE;
+
+                            //respond that did not receive the payment
+                            ACLMessage informFalse = msgIn.createReply();
+                            informFalse.setPerformative(ACLMessage.INFORM);
+                            ReceivedPayment receivedPayment = new ReceivedPayment();
+                            receivedPayment.setPaymentHash(rHashHex);
+                            AbsPredicate notReceivedPayment = new AbsPredicate(SL1Vocabulary.NOT);
+                            try {
+                                notReceivedPayment.set(SL1Vocabulary.NOT_WHAT, getContentManager().lookupOntology(LNTxOntology.ONTOLOGY_NAME).fromObject(receivedPayment));
+                                myAgent.getContentManager().fillContent(informFalse, notReceivedPayment);
+                                myAgent.send(informFalse);
+                            } catch (Codec.CodecException ex) {
+                                ex.printStackTrace();
+                            } catch (OntologyException ex) {
+                                ex.printStackTrace();
+                            }
                         }
                     }
                     break;

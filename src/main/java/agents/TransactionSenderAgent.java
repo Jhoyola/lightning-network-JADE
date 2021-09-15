@@ -1,11 +1,13 @@
 package agents;
 
+import jade.content.Predicate;
+import jade.content.abs.AbsPredicate;
 import jade.content.lang.Codec;
+import jade.content.lang.sl.SL1Vocabulary;
 import jade.content.lang.sl.SLCodec;
 import jade.content.onto.Ontology;
 import jade.content.onto.OntologyException;
 import jade.content.onto.basic.Action;
-import jade.content.onto.basic.TrueProposition;
 import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.Behaviour;
@@ -15,7 +17,6 @@ import jade.lang.acl.MessageTemplate;
 import jade.util.Logger;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 import LNTxOntology.*;
@@ -49,7 +50,7 @@ public class TransactionSenderAgent extends Agent {
         completePaymentsList = new ArrayList<CompletePayment>();
 
         // Register the codec for the SL0 language
-        getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL0);
+        getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL1);
         // Register the ontology used by this application
         getContentManager().registerOntology(LNTxOntology.getInstance());
 
@@ -245,15 +246,10 @@ public class TransactionSenderAgent extends Agent {
                                 ACLMessage receivedPaymentQueryMsg = msgIn.createReply();
                                 receivedPaymentQueryMsg.setPerformative(ACLMessage.QUERY_IF);
 
-                                ReceivedPaymentQuery invoiceQuery = new ReceivedPaymentQuery();
-                                invoiceQuery.setPaymentHash(rHashHex);
+                                ReceivedPayment receivedPayment = new ReceivedPayment();
+                                receivedPayment.setPaymentHash(rHashHex);
 
-                                Action respondIsPaymentReceivedAction = new Action();
-                                respondIsPaymentReceivedAction.setAction(invoiceQuery);
-                                respondIsPaymentReceivedAction.setActor(receiverAgent);
-
-                                myAgent.getContentManager().fillContent(receivedPaymentQueryMsg, respondIsPaymentReceivedAction);
-
+                                myAgent.getContentManager().fillContent(receivedPaymentQueryMsg, receivedPayment);
                                 myAgent.send(receivedPaymentQueryMsg);
 
                                 state = State.PAID;
@@ -269,15 +265,14 @@ public class TransactionSenderAgent extends Agent {
 
                                 //possible improvement: react to different rejections differently
                             }
-                        }catch (Exception e) {
+                        } catch (Exception e) {
                             failureReason = e.getMessage();
-                            myLogger.log(Logger.SEVERE, "Sender Agent: "+e.getMessage());
-                            //e.printStackTrace();
+                            myLogger.log(Logger.SEVERE, "Sender Agent: "+failureReason);
 
                             ACLMessage failureMsg = msgIn.createReply();
                             failureMsg.setPerformative(ACLMessage.FAILURE);
                             myAgent.send(failureMsg);
-                            state = State.FAILURE; //FAILED
+                            state = State.FAILURE;
                         }
                     }else{
                         block();
@@ -288,21 +283,20 @@ public class TransactionSenderAgent extends Agent {
                     if (msgIn != null) {
                         try {
 
-                            //Prepositions are compared using class
-                            Class informClass = myAgent.getContentManager().extractContent(msgIn).getClass();
-                            Class trueClass = (new TrueProposition()).getClass();
+                            //Check if receiver informed true or false
+                            Predicate pred = (Predicate)myAgent.getContentManager().extractContent(msgIn);
 
-                            if(informClass.equals(trueClass)) {
+                            if (pred.getClass().equals(ReceivedPayment.class)) {
                                 state = State.SUCCESS;
                                 timer.setEndTime();
+                            } else if (((AbsPredicate)pred).getTypeName().equals(SL1Vocabulary.NOT)) {
+                                throw new RuntimeException("Received inform message, that the receiver did not receive the payment.");
                             } else {
-                                state = State.FAILURE;
+                                throw new RuntimeException("Received a message with a predicate that was not understood.");
                             }
-
-                        } catch (Codec.CodecException e) {
-                            e.printStackTrace();
-                        } catch (OntologyException e) {
-                            e.printStackTrace();
+                        } catch (Exception e) {
+                            state = State.FAILURE;
+                            failureReason = e.getMessage();
                         }
                     }
                     break;
@@ -342,7 +336,7 @@ public class TransactionSenderAgent extends Agent {
             msg.addReceiver(receiverAgent);
             msg.setProtocol(LNPaymentProtocol.getProtocolName());
             msg.setOntology(LNTxOntology.ONTOLOGY_NAME);
-            msg.setLanguage(FIPANames.ContentLanguage.FIPA_SL0);
+            msg.setLanguage(FIPANames.ContentLanguage.FIPA_SL1);
             msg.setConversationId(convId.toString());
             msg.setReplyWith("Init_ln_tx_protocol_"+System.currentTimeMillis()); // Unique value
 

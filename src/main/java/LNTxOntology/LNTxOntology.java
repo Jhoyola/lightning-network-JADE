@@ -26,9 +26,7 @@ public class LNTxOntology extends BeanOntology {
             add(AcceptPaymentProposalAndCreateLNInvoice.class);
             add(LNInvoice.class);
             add(PaymentProposalAccepted.class);
-            add(ReceivedPaymentQuery.class);
-            //....
-
+            add(ReceivedPayment.class);
 
         } catch (Exception oe) {
             oe.printStackTrace();

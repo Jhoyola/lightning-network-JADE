@@ -60,11 +60,10 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
 
     protected void transactionComplete(CompletePayment payment) {
         if(payment.isSuccess()) {
-            System.out.println("RECEIVER: SUCCESS");
+            System.out.println("Receiver Agent: SUCCESS");
             System.out.println("Received: "+payment.getPaymentProposal().getAsStringForLogging());
         } else {
-            System.out.println("Receiver Agent: TRANSACTION FAILED!");
-            System.out.println(payment.getFailureReason());
+            System.out.println("Receiver Agent: PAYMENT FAILED: "+payment.getFailureReason());
         }
     }
 

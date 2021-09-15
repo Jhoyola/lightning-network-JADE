@@ -28,14 +28,13 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
 
     protected void transactionComplete(CompletePayment payment) {
         if(payment.isSuccess()) {
-            System.out.println("SENDER: SUCCESS");
+            System.out.println("Sender Agent: SUCCESS");
             System.out.println("Sent: "+payment.getPaymentProposal().getAsStringForLogging());
             System.out.println("The timing for the whole protocol: "+payment.getTimer().getTotalTime()+" ms");
             System.out.println("The timing for only the payment: "+payment.getTimer().getPaymentTime()+" ms");
             System.out.println("Fees paid: "+payment.getFeesPaid()+" sats");
         } else {
-            System.out.println("Sender Agent: TRANSACTION FAILED!");
-            System.out.println(payment.getFailureReason());
+            System.out.println("Sender Agent: PAYMENT FAILED: "+payment.getFailureReason());
         }
     }
 

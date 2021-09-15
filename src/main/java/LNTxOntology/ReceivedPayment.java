@@ -1,8 +1,8 @@
 package LNTxOntology;
 
-import jade.content.AgentAction;
+import jade.content.Predicate;
 
-public class ReceivedPaymentQuery implements AgentAction {
+public class ReceivedPayment implements Predicate{
 
     private String paymentHash;
 
