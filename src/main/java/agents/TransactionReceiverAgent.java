@@ -143,7 +143,7 @@ public class TransactionReceiverAgent extends Agent{
                         boolean acceptProposal = true;
                         String rejectionReason = "";
 
-                        //TODO: RAJOITA MONTAKO KERTAA RETRY SAMALTA AGENTILTA
+                        //Possible improvement: limit the amount of retries accepted from the same agent
 
                         try {
 
