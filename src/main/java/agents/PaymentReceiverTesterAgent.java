@@ -9,7 +9,7 @@ import util.CompletePayment;
 import util.ListedProduct;
 import util.ProductCatalog;
 
-public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
+public class PaymentReceiverTesterAgent extends PaymentReceiverAgent {
 
     private ProductCatalog productCatalog;
 
@@ -19,10 +19,10 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
         enableDebugLogging();
 
         //simnet
-        setLNHost("192.168.1.83", 10002, "src/main/resources/tls_simnet.cert", "src/main/resources/simnet_b_admin.macaroon");
+        setLNHost("192.168.178.83", 10002, "src/main/resources/tls_simnet.cert", "src/main/resources/simnet_b_admin.macaroon");
 
         //mainnet
-        //setLNHost("192.168.1.83", 10003, "src/main/resources/tls.cert", "src/main/resources/mainnet_a_admin.macaroon");
+        //setLNHost("192.168.178.83", 10003, "src/main/resources/tls.cert", "src/main/resources/mainnet_a_admin.macaroon");
 
 
         //ADD SOME PRODUCTS FOR TESTING
@@ -46,11 +46,11 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
         dfd.setName(getAID());
         ServiceDescription sd = new ServiceDescription();
         sd.setType("receive-ln-tx");
-        sd.setName("TransactionReceiverAgentService");
+        sd.setName("PaymentReceiverAgentService");
         dfd.addServices(sd);
         try {
             DFService.register(this, dfd);
-            addBehaviour(new TransactReceiveBehaviour(this, true));
+            addBehaviour(new PaymentReceiveBehaviour(this, true));
         } catch (FIPAException e) {
             System.out.println("Agent "+getLocalName()+" - Cannot register with DF");
             doDelete();
@@ -58,7 +58,7 @@ public class TransactionReceiverTesterAgent extends TransactionReceiverAgent {
 
     }
 
-    protected void transactionComplete(CompletePayment payment) {
+    protected void paymentComplete(CompletePayment payment) {
         if(payment.isSuccess()) {
             System.out.println("Receiver Agent: SUCCESS");
             System.out.println("Received: "+payment.getPaymentProposal().getAsStringForLogging());

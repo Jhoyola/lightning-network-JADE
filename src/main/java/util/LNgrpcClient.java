@@ -111,6 +111,24 @@ public class LNgrpcClient {
         return jsonMemo.toJSONString();
     }
 
+    //check that connection to the node works
+    public boolean canConnect() {
+        if(useMock) {
+            return true;
+        }
+
+        try {
+            Rpc.GetInfoResponse getInfoResponse = stub.getInfo(Rpc.GetInfoRequest.getDefaultInstance());
+            if(!getInfoResponse.getIdentityPubkey().isEmpty()) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     //retuns the balance in sats that can be sent
     public long getSendableBalance() {
         if(useMock) {

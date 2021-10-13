@@ -10,7 +10,7 @@ import jade.domain.FIPAException;
 import jade.util.Logger;
 import util.CompletePayment;
 
-public class TransactionSenderTesterAgent extends TransactionSenderAgent{
+public class PaymentSenderTesterAgent extends PaymentSenderAgent{
 
     protected void setup() {
         super.setup();
@@ -18,15 +18,15 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
         enableDebugLogging();
 
         //simnet
-        setLNHost("192.168.1.83", 10001, "src/main/resources/tls_simnet.cert", "src/main/resources/simnet_a_admin.macaroon");
+        setLNHost("192.168.178.83", 10001, "src/main/resources/tls_simnet.cert", "src/main/resources/simnet_a_admin.macaroon");
 
         //mainnet
-        //setLNHost("192.168.1.83", 10004, "src/main/resources/tls.cert", "src/main/resources/mainnet_b_admin.macaroon");
+        //setLNHost("192.168.178.83", 10004, "src/main/resources/tls.cert", "src/main/resources/mainnet_b_admin.macaroon");
 
-        addBehaviour(new LoopTransactSendBehaviour(this));
+        addBehaviour(new LoopPaymentSendBehaviour(this));
     }
 
-    protected void transactionComplete(CompletePayment payment) {
+    protected void paymentComplete(CompletePayment payment) {
         if(payment.isSuccess()) {
             System.out.println("Sender Agent: SUCCESS");
             System.out.println("Sent: "+payment.getPaymentProposal().getAsStringForLogging());
@@ -39,7 +39,7 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
     }
 
     //Find receivers and start protocol as sender
-    private class LoopTransactSendBehaviour extends OneShotBehaviour {
+    private class LoopPaymentSendBehaviour extends OneShotBehaviour {
 
         Agent a;
 
@@ -48,7 +48,7 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
         double valCurr = 0.05; //value in base currency
         String prodId = "prod_1"; //product id for the receiver
 
-        public LoopTransactSendBehaviour(Agent a) {
+        public LoopPaymentSendBehaviour(Agent a) {
             this.a = a;
         }
 
@@ -88,7 +88,7 @@ public class TransactionSenderTesterAgent extends TransactionSenderAgent{
 
                 if(result.length > 0) {
                     AID receiver = result[0].getName();
-                    addBehaviour(new TransactSendBehaviour(a, receiver, currency, valCurr, prodId));
+                    addBehaviour(new PaymentSendBehaviour(a, receiver, currency, valCurr, prodId));
                 } else {
                     System.out.println("Didn't find a receiver");
                 }

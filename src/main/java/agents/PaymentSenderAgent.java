@@ -23,8 +23,8 @@ import LNTxOntology.*;
 import util.*;
 
 
-//The transaction sender agent initiates the conversation
-public class TransactionSenderAgent extends Agent {
+//The payment sender agent initiates the conversation
+public class PaymentSenderAgent extends Agent {
 
     private enum State {
         INITIAL,    // 1
@@ -40,7 +40,7 @@ public class TransactionSenderAgent extends Agent {
 
     private LNgrpcClient lnClient;
 
-    //Maximum fees in sats for a single transaction
+    //Maximum fees in sats for a single payment
     private int feeLimitSat = 50;
 
     protected ArrayList<CompletePayment> completePaymentsList;
@@ -76,21 +76,21 @@ public class TransactionSenderAgent extends Agent {
     }
 
     protected void enableDebugLogging() {
+        //fine logging does not seem to work unless JADE logger manager is activated
         myLogger.setLevel(Logger.FINE);
-        //TODO: NOT WORKING UNLESS LOGGER MANAGER IS ACTIVATED
     }
 
     //this can be overwritten to invoke desired action after the payment completes
-    protected void transactionComplete(CompletePayment payment) {
+    protected void paymentComplete(CompletePayment payment) {
         if (payment.isSuccess()) {
-            myLogger.log(Logger.INFO, "Sender Agent: Transaction success.");
+            myLogger.log(Logger.INFO, "Sender Agent: Payment success.");
         } else {
-            myLogger.log(Logger.SEVERE, "Sender Agent: Transaction failed.");
+            myLogger.log(Logger.SEVERE, "Sender Agent: Payment failed.");
             myLogger.log(Logger.SEVERE, payment.getFailureReason());
         }
     }
 
-    protected class TransactSendBehaviour extends Behaviour {
+    protected class PaymentSendBehaviour extends Behaviour {
 
         //The counterparty agent
         private AID receiverAgent;
@@ -121,11 +121,11 @@ public class TransactionSenderAgent extends Agent {
         private String failureReason = "";
 
 
-        protected TransactSendBehaviour(Agent a, AID receiverAgent, String currency, double valCurr, String payId) {
+        protected PaymentSendBehaviour(Agent a, AID receiverAgent, String currency, double valCurr, String payId) {
 
             super(a);
 
-            myLogger.log(Logger.FINE, "Starting TransactSendBehaviour");
+            myLogger.log(Logger.FINE, "Starting PaymentSendBehaviour");
 
             timer = new TransactionTimer();
             timer.setStartTime();
@@ -169,6 +169,11 @@ public class TransactionSenderAgent extends Agent {
                         //Get the value converted to satoshis from the API. Cast to int, so satoshis are int value.
                         paymentProposal.setSatsValue(priceApi.getSatsValue(currVal,currency));
 
+                        //check that can connect to the LN client
+                        if(!lnClient.canConnect()) {
+                            throw new RuntimeException("Cannot connect to LND");
+                        }
+
                         //check that has enough balance to send on the ln node
                         if (lnClient.getSendableBalance() < paymentProposal.getSatsValue()) {
                             throw new RuntimeException("Not enough outgoing balance.");
@@ -200,6 +205,7 @@ public class TransactionSenderAgent extends Agent {
 
                         //add to retries if sending initiation fails
                         retries += 1;
+                        failureReason = e.getMessage();
                         state = State.INITIAL;
                     }
 
@@ -279,7 +285,7 @@ public class TransactionSenderAgent extends Agent {
                     }
                     break;
                 case PAID:
-                    //receive the final inform message to conclude the transaction
+                    //receive the final inform message to conclude the payment
                     if (msgIn != null) {
                         try {
 
@@ -315,13 +321,13 @@ public class TransactionSenderAgent extends Agent {
                 CompletePayment p = new CompletePayment(CompletePayment.Role.SENDER, false, paymentProposal, rHashHex, convId, receiverAgent, feePaidSats, timer);
                 p.setFailureReason(failureReason);
                 completePaymentsList.add(p);
-                transactionComplete(p);
+                paymentComplete(p);
                 return true;
             }
             if (state == State.SUCCESS) {
                 CompletePayment p = new CompletePayment(CompletePayment.Role.SENDER, true, paymentProposal, rHashHex, convId, receiverAgent, feePaidSats, timer);
                 completePaymentsList.add(p);
-                transactionComplete(p);
+                paymentComplete(p);
                 return true;
             }
 

@@ -20,7 +20,7 @@ import java.util.UUID;
 import LNTxOntology.*;
 import util.*;
 
-public class TransactionReceiverAgent extends Agent{
+public class PaymentReceiverAgent extends Agent{
 
     private enum State {
         INITIAL,            // 1
@@ -84,8 +84,8 @@ public class TransactionReceiverAgent extends Agent{
     }
 
     protected void enableDebugLogging() {
+        //fine logging does not seem to work unless JADE logger manager is activated
         myLogger.setLevel(Logger.FINE);
-        //TODO: NOT WORKING UNLESS LOGGER MANAGER IS ACTIVATED
     }
 
     //this function can be overwritten to set rules for proposal acceptance
@@ -95,16 +95,16 @@ public class TransactionReceiverAgent extends Agent{
     }
 
     //this can be overwritten to invoke desired action after the payment completes
-    protected void transactionComplete(CompletePayment payment) {
+    protected void paymentComplete(CompletePayment payment) {
         if (payment.isSuccess()) {
-            myLogger.log(Logger.INFO, "Receiver Agent: Transaction success.");
+            myLogger.log(Logger.INFO, "Receiver Agent: Payment success.");
         } else {
-            myLogger.log(Logger.SEVERE, "Receiver Agent: Transaction failed.");
+            myLogger.log(Logger.SEVERE, "Receiver Agent: Payment failed.");
             myLogger.log(Logger.SEVERE, payment.getFailureReason());
         }
     }
 
-    protected class TransactReceiveBehaviour extends Behaviour {
+    protected class PaymentReceiveBehaviour extends Behaviour {
 
         //The counterparty agent
         private AID senderAgent;
@@ -124,9 +124,9 @@ public class TransactionReceiverAgent extends Agent{
 
         private String failureReason = "";
 
-        protected TransactReceiveBehaviour(Agent a, boolean perpetual) {
+        protected PaymentReceiveBehaviour(Agent a, boolean perpetual) {
             super(a);
-            myLogger.log(Logger.FINE, "Starting TransactReceiveBehaviour");
+            myLogger.log(Logger.FINE, "Starting PaymentReceiveBehaviour");
             perpetualOperation = perpetual;
             initializeBehaviour();
         }
@@ -183,6 +183,11 @@ public class TransactionReceiverAgent extends Agent{
                             if(satsValueDeviation > priceTolerance) {
                                 rejectionReason += "\nSatoshi values don't match, deviation: "+satsValueDeviation;
                                 acceptProposal = false;
+                            }
+
+                            //check that can connect to the LN client
+                            if(!lnClient.canConnect()) {
+                                throw new RuntimeException("Cannot connect to LND");
                             }
 
                             if(lnClient.getReceivableBalance() < proposedSatsValue) {
@@ -324,7 +329,7 @@ public class TransactionReceiverAgent extends Agent{
                 CompletePayment p = new CompletePayment(CompletePayment.Role.RECEIVER, false, receivedPaymentProposal, rHashHex, convId, senderAgent, -1, null);
                 p.setFailureReason(failureReason);
                 completePaymentsList.add(p);
-                transactionComplete(p);
+                paymentComplete(p);
 
                 //quit behaviour if not perpetual
                 if(!perpetualOperation) {
@@ -340,7 +345,7 @@ public class TransactionReceiverAgent extends Agent{
                 //set fees to null as the receiver does not know how much fees was paid
                 CompletePayment p = new CompletePayment(CompletePayment.Role.RECEIVER, true, receivedPaymentProposal, rHashHex, convId, senderAgent, -1, null);
                 completePaymentsList.add(p);
-                transactionComplete(p);
+                paymentComplete(p);
 
                 //quit behaviour if not perpetual
                 if(!perpetualOperation) {
