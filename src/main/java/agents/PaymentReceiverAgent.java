@@ -59,9 +59,6 @@ public class PaymentReceiverAgent extends Agent{
         // Register the ontology used by this application
         getContentManager().registerOntology(LNTxOntology.getInstance());
 
-        //Use different price api than the sender to simulate realistic situation
-        priceApi = new PriceAPIWrapper(new PriceAPICoindesk());
-
     }
 
     protected void setLNHost(String host, int port, String certPath, String macaroonPath) {
@@ -168,6 +165,11 @@ public class PaymentReceiverAgent extends Agent{
                             if(!isProposalAccepted(receivedPaymentProposal)) {
                                 rejectionReason += "\nPayment id or price not accepted!";
                                 acceptProposal = false;
+                            }
+
+                            //check that priceApi exists
+                            if(priceApi == null) {
+                                throw new RuntimeException("PriceApi not defined");
                             }
 
                             //validate that the satoshis price matches to the proposed value in traditional currency

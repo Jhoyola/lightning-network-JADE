@@ -54,8 +54,6 @@ public class PaymentSenderAgent extends Agent {
         // Register the ontology used by this application
         getContentManager().registerOntology(LNTxOntology.getInstance());
 
-        priceApi = new PriceAPIWrapper(new PriceAPICoinGecko());
-
     }
 
     protected void setPriceApi(PriceAPI priceApiImplementation) {
@@ -164,6 +162,11 @@ public class PaymentSenderAgent extends Agent {
                             throw new RuntimeException("Currency value cannot be negative.");
                         } else if (currency.isEmpty()) {
                             throw new RuntimeException("Currency unit missing.");
+                        }
+
+                        //check that priceApi exists
+                        if(priceApi == null) {
+                            throw new RuntimeException("PriceApi not defined");
                         }
 
                         //Get the value converted to satoshis from the API. Cast to int, so satoshis are int value.

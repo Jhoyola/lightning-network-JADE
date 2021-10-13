@@ -5,9 +5,7 @@ import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
-import util.CompletePayment;
-import util.ListedProduct;
-import util.ProductCatalog;
+import util.*;
 
 public class PaymentReceiverTesterAgent extends PaymentReceiverAgent {
 
@@ -24,6 +22,8 @@ public class PaymentReceiverTesterAgent extends PaymentReceiverAgent {
         //mainnet
         //setLNHost("192.168.178.83", 10003, "src/main/resources/tls.cert", "src/main/resources/mainnet_a_admin.macaroon");
 
+        //Use different price api than the sender to simulate realistic situation
+        setPriceApi(new PriceAPICoinGecko());
 
         //ADD SOME PRODUCTS FOR TESTING
         //Use the "payment id" as product id

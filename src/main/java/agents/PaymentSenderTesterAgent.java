@@ -9,6 +9,7 @@ import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import jade.util.Logger;
 import util.CompletePayment;
+import util.PriceAPICoindesk;
 
 public class PaymentSenderTesterAgent extends PaymentSenderAgent{
 
@@ -22,6 +23,9 @@ public class PaymentSenderTesterAgent extends PaymentSenderAgent{
 
         //mainnet
         //setLNHost("192.168.178.83", 10004, "src/main/resources/tls.cert", "src/main/resources/mainnet_b_admin.macaroon");
+
+        //Use different price api than the receiver to simulate realistic situation
+        setPriceApi(new PriceAPICoindesk());
 
         addBehaviour(new LoopPaymentSendBehaviour(this));
     }
