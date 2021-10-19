@@ -1,6 +1,6 @@
 package agents;
 
-import LNTxOntology.PaymentProposal;
+import LNPaymentOntology.PaymentProposal;
 import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;

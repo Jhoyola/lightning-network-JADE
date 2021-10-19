@@ -1,8 +1,8 @@
-package LNTxOntology;
+package LNPaymentOntology;
 
 //Class implementation following JavaBeans, to create a bean ontology
 
-public class PaymentProposal extends TxValue {
+public class PaymentProposal extends PaymentValue {
 
     private String payId;
 

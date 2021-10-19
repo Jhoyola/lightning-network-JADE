@@ -2,11 +2,9 @@ package agents;
 
 import jade.content.Predicate;
 import jade.content.abs.AbsPredicate;
-import jade.content.lang.Codec;
 import jade.content.lang.sl.SL1Vocabulary;
 import jade.content.lang.sl.SLCodec;
 import jade.content.onto.Ontology;
-import jade.content.onto.OntologyException;
 import jade.content.onto.basic.Action;
 import jade.core.AID;
 import jade.core.Agent;
@@ -19,7 +17,7 @@ import jade.util.Logger;
 import java.util.ArrayList;
 import java.util.UUID;
 
-import LNTxOntology.*;
+import LNPaymentOntology.*;
 import util.*;
 
 
@@ -52,7 +50,7 @@ public class PaymentSenderAgent extends Agent {
         // Register the codec for the SL0 language
         getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL1);
         // Register the ontology used by this application
-        getContentManager().registerOntology(LNTxOntology.getInstance());
+        getContentManager().registerOntology(LNPaymentOntology.getInstance());
 
     }
 
@@ -140,7 +138,7 @@ public class PaymentSenderAgent extends Agent {
 
             this.maxRetries = 3;
 
-            this.ontology = getContentManager().lookupOntology(LNTxOntology.ONTOLOGY_NAME);
+            this.ontology = getContentManager().lookupOntology(LNPaymentOntology.ONTOLOGY_NAME);
         }
 
         public void action() {
@@ -344,7 +342,7 @@ public class PaymentSenderAgent extends Agent {
             ACLMessage msg = new ACLMessage(ACLMessage.PROPOSE);
             msg.addReceiver(receiverAgent);
             msg.setProtocol(LNPaymentProtocol.getProtocolName());
-            msg.setOntology(LNTxOntology.ONTOLOGY_NAME);
+            msg.setOntology(LNPaymentOntology.ONTOLOGY_NAME);
             msg.setLanguage(FIPANames.ContentLanguage.FIPA_SL1);
             msg.setConversationId(convId.toString());
             msg.setReplyWith("Init_ln_tx_protocol_"+System.currentTimeMillis()); // Unique value
@@ -353,20 +351,16 @@ public class PaymentSenderAgent extends Agent {
         }
 
         private void setMessageTemplate(int[] acceptedPerformatives, String inReplyTo) {
-
             //always add protocol to the template
             MessageTemplate template = MessageTemplate.MatchProtocol(LNPaymentProtocol.getProtocolName());
-
             //add conversation id if exists
             if (this.convId != null && this.convId.toString() != "") {
                 template = MessageTemplate.and(template, MessageTemplate.MatchConversationId(this.convId.toString()));
             }
-
             //add 'in reply to' if given
             if(!inReplyTo.isEmpty()) {
                 template = MessageTemplate.and(template, MessageTemplate.MatchInReplyTo(inReplyTo));
             }
-
             //add performatives if any
             if (acceptedPerformatives.length > 0) {
                 //add the first performative
@@ -377,7 +371,6 @@ public class PaymentSenderAgent extends Agent {
                 }
                 template = MessageTemplate.and(template, performativesTemplate);
             }
-
             this.replyTemplate = template;
         }
 

@@ -17,7 +17,7 @@ import jade.util.Logger;
 import java.util.ArrayList;
 import java.util.UUID;
 
-import LNTxOntology.*;
+import LNPaymentOntology.*;
 import util.*;
 
 public class PaymentReceiverAgent extends Agent{
@@ -57,7 +57,7 @@ public class PaymentReceiverAgent extends Agent{
         // Register the codec for the SL1 language
         getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL1);
         // Register the ontology used by this application
-        getContentManager().registerOntology(LNTxOntology.getInstance());
+        getContentManager().registerOntology(LNPaymentOntology.getInstance());
 
     }
 
@@ -308,7 +308,7 @@ public class PaymentReceiverAgent extends Agent{
                             receivedPayment.setPaymentHash(rHashHex);
                             AbsPredicate notReceivedPayment = new AbsPredicate(SL1Vocabulary.NOT);
                             try {
-                                notReceivedPayment.set(SL1Vocabulary.NOT_WHAT, getContentManager().lookupOntology(LNTxOntology.ONTOLOGY_NAME).fromObject(receivedPayment));
+                                notReceivedPayment.set(SL1Vocabulary.NOT_WHAT, getContentManager().lookupOntology(LNPaymentOntology.ONTOLOGY_NAME).fromObject(receivedPayment));
                                 myAgent.getContentManager().fillContent(informFalse, notReceivedPayment);
                                 myAgent.send(informFalse);
                             } catch (Codec.CodecException ex) {

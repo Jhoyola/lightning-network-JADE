@@ -1,7 +1,6 @@
-package LNTxOntology;
+package LNPaymentOntology;
 
 import jade.content.AgentAction;
-import jade.content.Predicate;
 
 public class AcceptPaymentProposalAndCreateLNInvoice implements AgentAction {
 

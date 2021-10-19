@@ -1,4 +1,4 @@
-package LNTxOntology;
+package LNPaymentOntology;
 
 import jade.content.Predicate;
 import jade.content.onto.annotations.Slot;

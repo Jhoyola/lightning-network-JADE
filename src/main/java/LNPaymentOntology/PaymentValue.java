@@ -1,11 +1,11 @@
-package LNTxOntology;
+package LNPaymentOntology;
 
 import jade.content.Concept;
 
 
 //Class implementation following JavaBeans, to create a bean ontology
 
-public class TxValue implements Concept {
+public class PaymentValue implements Concept {
 
     private String currency;
     private double currencyValue;

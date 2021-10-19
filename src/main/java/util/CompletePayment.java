@@ -1,6 +1,6 @@
 package util;
 
-import LNTxOntology.PaymentProposal;
+import LNPaymentOntology.PaymentProposal;
 import jade.core.AID;
 
 import java.util.Date;

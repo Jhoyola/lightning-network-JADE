@@ -1,14 +1,14 @@
-package LNTxOntology;
+package LNPaymentOntology;
 
 import jade.content.onto.*;
 
-public class LNTxOntology extends BeanOntology {
+public class LNPaymentOntology extends BeanOntology {
 
     // The name identifying this ontology
     public static final String ONTOLOGY_NAME = "LightningNetwork-ontology";
 
     // The singleton instance of this ontology
-    private static Ontology theInstance = new LNTxOntology();
+    private static Ontology theInstance = new LNPaymentOntology();
 
     // This is the method to access the singleton ontology object
     public static Ontology getInstance() {
@@ -16,12 +16,12 @@ public class LNTxOntology extends BeanOntology {
     }
 
     // Private constructor
-    private LNTxOntology() {
-        // The LNTxOntology extends the basic ontology
+    private LNPaymentOntology() {
+        // The LNPaymentOntology extends the basic ontology
         super(ONTOLOGY_NAME);
 
         try {
-            add(TxValue.class);
+            add(PaymentValue.class);
             add(PaymentProposal.class);
             add(AcceptPaymentProposalAndCreateLNInvoice.class);
             add(LNInvoice.class);
