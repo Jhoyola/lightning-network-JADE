@@ -18,8 +18,11 @@ public class PaymentSenderTesterAgent extends PaymentSenderAgent{
 
         enableDebugLogging();
 
+        //mock
+        setLNHost("", 0, "", "");
+
         //simnet
-        setLNHost("192.168.178.83", 10001, "src/main/resources/tls_simnet.cert", "src/main/resources/simnet_a_admin.macaroon");
+        //setLNHost("192.168.178.83", 10001, "src/main/resources/tls_simnet.cert", "src/main/resources/simnet_a_admin.macaroon");
 
         //mainnet
         //setLNHost("192.168.178.83", 10004, "src/main/resources/tls.cert", "src/main/resources/mainnet_b_admin.macaroon");

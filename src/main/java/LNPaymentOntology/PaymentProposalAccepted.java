@@ -4,7 +4,6 @@ import jade.content.Predicate;
 import jade.content.onto.annotations.Slot;
 
 public class PaymentProposalAccepted implements Predicate {
-    private boolean accepted;
     private PaymentProposal paymentProposal;
     private LNInvoice lnInvoice;
     private String reasonForRejection;
@@ -25,14 +24,6 @@ public class PaymentProposalAccepted implements Predicate {
     @Slot(mandatory = false)
     public LNInvoice getLnInvoice() {
         return lnInvoice;
-    }
-
-    public void setAccepted(boolean accepted) {
-        this.accepted = accepted;
-    }
-
-    public boolean isAccepted() {
-        return accepted;
     }
 
     public void setReasonForRejection(String reasonForRejection) {

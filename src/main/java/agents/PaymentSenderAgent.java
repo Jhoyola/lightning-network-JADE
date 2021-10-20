@@ -1,7 +1,10 @@
 package agents;
 
+import jade.content.ContentElement;
 import jade.content.Predicate;
+import jade.content.abs.AbsObject;
 import jade.content.abs.AbsPredicate;
+import jade.content.abs.AbsTerm;
 import jade.content.lang.sl.SL1Vocabulary;
 import jade.content.lang.sl.SLCodec;
 import jade.content.onto.Ontology;
@@ -47,7 +50,7 @@ public class PaymentSenderAgent extends Agent {
 
         completePaymentsList = new ArrayList<CompletePayment>();
 
-        // Register the codec for the SL0 language
+        // Register the codec for the SL1 language
         getContentManager().registerLanguage(new SLCodec(), FIPANames.ContentLanguage.FIPA_SL1);
         // Register the ontology used by this application
         getContentManager().registerOntology(LNPaymentOntology.getInstance());
@@ -215,9 +218,22 @@ public class PaymentSenderAgent extends Agent {
                     //Receive the accepted message including the invoice
                     if(msgIn != null){
                         try {
-                            PaymentProposalAccepted proposalReply = (PaymentProposalAccepted) myAgent.getContentManager().extractContent(msgIn);
 
-                            if (proposalReply.isAccepted()) {
+                            PaymentProposalAccepted proposalReply = null;
+                            Predicate pred = (Predicate)myAgent.getContentManager().extractContent(msgIn);
+                            boolean accepted;
+
+                            if(msgIn.getPerformative() == ACLMessage.ACCEPT_PROPOSAL && pred.getClass().equals(PaymentProposalAccepted.class)) {
+                                proposalReply = (PaymentProposalAccepted) pred;
+                                accepted = true;
+                            } else if (msgIn.getPerformative() == ACLMessage.REJECT_PROPOSAL && ((AbsPredicate)pred).getTypeName().equals(SL1Vocabulary.NOT)) {
+                                proposalReply = (PaymentProposalAccepted) ontology.toObject(((AbsPredicate) pred).getAbsObject("what"));
+                                accepted = false;
+                            } else {
+                                throw new RuntimeException("Received performative and predicate do not match.");
+                            }
+
+                            if (accepted) {
                                 //receiver accepted the payment proposal
 
                                 //Get the lightning network encoded invoice

@@ -36,7 +36,7 @@ public class PaymentReceiverAgent extends Agent{
     private LNgrpcClient lnClient;
 
     //Price tolerance: accepted relative deviation in bitcoin price (0-1)
-    private double priceTolerance = 0.01; // 1 %
+    private double priceTolerance = 0.02; // 2 %
 
     protected ArrayList<CompletePayment> completePaymentsList;
 
@@ -224,7 +224,6 @@ public class PaymentReceiverAgent extends Agent{
                                 LNInvoice invoice = new LNInvoice();
                                 invoice.setInvoicestr(invoiceStr);
                                 PaymentProposalAccepted paymentProposalAccepted = new PaymentProposalAccepted();
-                                paymentProposalAccepted.setAccepted(true);
                                 paymentProposalAccepted.setLnInvoice(invoice);
                                 paymentProposalAccepted.setPaymentProposal(receivedPaymentProposal);
                                 paymentProposalAccepted.setReasonForRejection("");
@@ -370,16 +369,18 @@ public class PaymentReceiverAgent extends Agent{
             ACLMessage reject = msgIn.createReply();
             reject.setPerformative(ACLMessage.REJECT_PROPOSAL);
 
-            PaymentProposalAccepted paymentProposalRejected = new PaymentProposalAccepted();
-            paymentProposalRejected.setAccepted(false);
-            paymentProposalRejected.setPaymentProposal(receivedPaymentProposal);
-            paymentProposalRejected.setReasonForRejection(reason);
+            PaymentProposalAccepted paymentProposalAccepted = new PaymentProposalAccepted();
+            paymentProposalAccepted.setPaymentProposal(receivedPaymentProposal);
+            paymentProposalAccepted.setReasonForRejection(reason);
             //add empty invoice
             LNInvoice invoice = new LNInvoice();
             invoice.setInvoicestr("");
-            paymentProposalRejected.setLnInvoice(invoice);
+            paymentProposalAccepted.setLnInvoice(invoice);
 
             try {
+                //reject by setting NOT accepted
+                AbsPredicate paymentProposalRejected = new AbsPredicate(SL1Vocabulary.NOT);
+                paymentProposalRejected.set(SL1Vocabulary.NOT_WHAT, getContentManager().lookupOntology(LNPaymentOntology.ONTOLOGY_NAME).fromObject(paymentProposalAccepted));
                 myAgent.getContentManager().fillContent(reject, paymentProposalRejected);
                 myAgent.send(reject);
             } catch (Exception e) {
