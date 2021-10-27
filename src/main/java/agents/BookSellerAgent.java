@@ -21,6 +21,8 @@ Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 Boston, MA  02111-1307, USA.
  *****************************************************************/
 
+// This agent is extended from the original JADE BookSellerAgent
+
 package agents;
 
 import LNPaymentOntology.PaymentProposal;
@@ -142,7 +144,8 @@ public class BookSellerAgent extends PaymentReceiverAgent {
 
 		Integer price = (Integer) soldBooksPendingPayment.get(proposal.getPayId());
 
-		if (price != null && price.equals((int)proposal.getCurrencyValue())) {
+		//The price is in cents for the BookBuyer and BookSeller, but in Euros for the payment protocol.
+		if (price != null && price.equals((int)(proposal.getCurrencyValue()*100))) {
 			System.out.println("OK, making payment of correct book.");
 			return true;
 		}

@@ -21,6 +21,8 @@ Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 Boston, MA  02111-1307, USA.
  *****************************************************************/
 
+// This agent is extended from the original JADE BookBuyerAgent
+
 package agents;
 
 import agents.PaymentSenderAgent;
@@ -194,7 +196,8 @@ public class BookBuyerAgent extends PaymentSenderAgent {
 
 						//MAKE PAYMENT
 						//payment id = title/orderxxxxxx
-						addBehaviour(new PaymentSendBehaviour(myAgent, reply.getSender(), "eur", bestPrice, targetBookTitle+"/"+reply.getInReplyTo()));
+						//The price is in cents for the BookBuyer and BookSeller, but in Euros for the payment protocol.
+						addBehaviour(new PaymentSendBehaviour(myAgent, reply.getSender(), "eur", ((double)bestPrice)/100.0, targetBookTitle+"/"+reply.getInReplyTo()));
 
 						System.out.println(targetBookTitle+" reserved from agent "+reply.getSender().getName()+". Starting payment.");
 						System.out.println("Price = "+bestPrice);
