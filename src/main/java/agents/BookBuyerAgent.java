@@ -21,8 +21,9 @@ Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 Boston, MA  02111-1307, USA.
  *****************************************************************/
 
-package agents.bookTrading;
+package agents;
 
+import agents.PaymentSenderAgent;
 import jade.core.Agent;
 import jade.core.AID;
 import jade.core.behaviours.*;
@@ -32,8 +33,10 @@ import jade.domain.DFService;
 import jade.domain.FIPAException;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
+import util.CompletePayment;
+import util.PriceAPICoinGecko;
 
-public class BookBuyerAgent extends Agent {
+public class BookBuyerAgent extends PaymentSenderAgent {
 	// The title of the book to buy
 	private String targetBookTitle;
 	// The list of known seller agents
@@ -41,6 +44,16 @@ public class BookBuyerAgent extends Agent {
 
 	// Put agent initializations here
 	protected void setup() {
+
+		//setup the payment sender
+		//----------------------------
+		super.setup();
+		//mock
+		setLNHost("", 0, "", "");
+		setPriceApi(new PriceAPICoinGecko());
+		//----------------------------
+
+
 		// Printout a welcome message
 		System.out.println("Hallo! Buyer-agent "+getAID().getName()+" is ready.");
 
@@ -88,6 +101,22 @@ public class BookBuyerAgent extends Agent {
 	protected void takeDown() {
 		// Printout a dismissal message
 		System.out.println("Buyer-agent "+getAID().getName()+" terminating.");
+	}
+
+	protected void paymentComplete(CompletePayment payment) {
+		if(payment.isSuccess()) {
+			System.out.println("Buyer Agent: SUCCESS");
+			System.out.println(targetBookTitle+" successfully purchased");
+			System.out.println("Sent: "+payment.getPaymentProposal().getAsStringForLogging());
+			System.out.println("The timing for the whole protocol: "+payment.getTimer().getTotalTime()+" ms");
+			System.out.println("The timing for only the payment: "+payment.getTimer().getPaymentTime()+" ms");
+			System.out.println("Fees paid: "+payment.getFeesPaid()+" sats");
+
+			//delete agent once book is bought
+			doDelete();
+		} else {
+			System.out.println("Buyer Agent: PAYMENT FAILED: "+payment.getFailureReason());
+		}
 	}
 
 	/**
@@ -162,10 +191,13 @@ public class BookBuyerAgent extends Agent {
 				if (reply != null) {
 					// Purchase order reply received
 					if (reply.getPerformative() == ACLMessage.INFORM) {
-						// Purchase successful. We can terminate
-						System.out.println(targetBookTitle+" successfully purchased from agent "+reply.getSender().getName());
+
+						//MAKE PAYMENT
+						//payment id = title/orderxxxxxx
+						addBehaviour(new PaymentSendBehaviour(myAgent, reply.getSender(), "eur", bestPrice, targetBookTitle+"/"+reply.getInReplyTo()));
+
+						System.out.println(targetBookTitle+" reserved from agent "+reply.getSender().getName()+". Starting payment.");
 						System.out.println("Price = "+bestPrice);
-						myAgent.doDelete();
 					}
 					else {
 						System.out.println("Attempt failed: requested book already sold.");
@@ -184,6 +216,7 @@ public class BookBuyerAgent extends Agent {
 			if (step == 2 && bestSeller == null) {
 				System.out.println("Attempt failed: "+targetBookTitle+" not available for sale");
 			}
+
 			return ((step == 2 && bestSeller == null) || step == 4);
 		}
 	}  // End of inner class RequestPerformer

@@ -21,9 +21,9 @@ Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 Boston, MA  02111-1307, USA.
  *****************************************************************/
 
-package agents.bookTrading;
+package agents;
 
-import jade.core.Agent;
+import LNPaymentOntology.PaymentProposal;
 import jade.core.behaviours.*;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
@@ -31,17 +31,37 @@ import jade.domain.DFService;
 import jade.domain.FIPAException;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
+import util.CompletePayment;
+import util.PriceAPICoinGecko;
 
 import java.util.*;
 
-public class BookSellerAgent extends Agent {
+public class BookSellerAgent extends PaymentReceiverAgent {
 	// The catalogue of books for sale (maps the title of a book to its price)
 	private Hashtable catalogue;
 	// The GUI by means of which the user can add books in the catalogue
 	private BookSellerGui myGui;
 
+	private Hashtable soldBooksPendingPayment;
+
 	// Put agent initializations here
 	protected void setup() {
+
+		//setup the payment receiver
+		//----------------------------
+		super.setup();
+
+		//create catalogue of books that are in process of payment
+		soldBooksPendingPayment = new Hashtable();
+
+		//mock
+		setLNHost("", 0, "", "");
+
+		setPriceApi(new PriceAPICoinGecko());
+		addBehaviour(new PaymentReceiveBehaviour(this, true));
+
+		//----------------------------
+
 		// Create the catalogue
 		catalogue = new Hashtable();
 
@@ -97,6 +117,43 @@ public class BookSellerAgent extends Agent {
 		} );
 	}
 
+	protected void paymentComplete(CompletePayment payment) {
+
+		String payId = payment.getPaymentProposal().getPayId();
+		String title = payId.split("/")[0];
+
+		//remove from the pending books
+		Integer price = (Integer) soldBooksPendingPayment.remove(payId);
+
+		if(payment.isSuccess()) {
+			System.out.println("SELLER: SUCCESS, "+title+" is paid for.");
+
+		} else {
+			System.out.println("SELLER: FAIL, payment of "+title+" failed.");
+
+			//put back to catalogue as the sale was not successful
+			catalogue.put(title, price);
+		}
+	}
+
+	//set rules for accepting the proposal
+	protected boolean isProposalAccepted(PaymentProposal proposal) {
+		System.out.println("Checking if the book corresponds to the book that is being sold.");
+
+		Integer price = (Integer) soldBooksPendingPayment.get(proposal.getPayId());
+
+		if (price != null && price.equals((int)proposal.getCurrencyValue())) {
+			System.out.println("OK, making payment of correct book.");
+			return true;
+		}
+
+		//not accepted
+		System.out.println("Fail, payment id or the price of the book is not valid.");
+		return false;
+	}
+
+
+
 	/**
 	   Inner class OfferRequestsServer.
 	   This is the behaviour used by Book-seller agents to serve incoming requests 
@@ -151,9 +208,15 @@ public class BookSellerAgent extends Agent {
 				ACLMessage reply = msg.createReply();
 
 				Integer price = (Integer) catalogue.remove(title);
+
 				if (price != null) {
 					reply.setPerformative(ACLMessage.INFORM);
-					System.out.println(title+" sold to agent "+msg.getSender().getName());
+
+					//insert the book to the pending queue
+					//the key in the pending books is title/orderxxxxxx
+					soldBooksPendingPayment.put(title+"/"+reply.getInReplyTo(), price);
+
+					System.out.println("Seller: "+title+" purchase order accepted from "+msg.getSender().getName()+". Waiting for payment.");
 				}
 				else {
 					// The requested book has been sold to another buyer in the meanwhile .
