@@ -16,8 +16,9 @@
 
 #### Implementation for new use cases
 
-- PaymentReceiverTesterAgent and PaymentSenderTesterAgent act as examples how to use the system
-- Inherit the PaymentReceiverAgent or PaymentSenderAgent. There should be no need to edit PaymentReceiverAgent or PaymentSenderAgent.  
+- PaymentReceiverTesterAgent and PaymentSenderTesterAgent act as examples how to use the system.  
+- Extend the PaymentReceiverAgent or PaymentSenderAgent. There should be no need to edit PaymentReceiverAgent or PaymentSenderAgent.  
+- super.setup() function should be called in the beginning of the setup function of the extended agent.  
 - LND node rpc connection paramenters should be defined using the setLNHost function.  
 - Price api should be defined using the setPriceApi function. New price apis can be defined: they should implement the PriceAPI interface.  
 - isProposalAccepted function can be overwritten for the payment receiver to make custom rules for accepting the payment.  
