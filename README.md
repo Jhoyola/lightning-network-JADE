@@ -1,6 +1,7 @@
 # JADE MAS micropayments using Bitcoin Lightning Network
 
 - Developed for the Master's Thesis of Juho Yrjölä (juho.yrjola@iki.fi) in Tampere University, Program of Automation Engineering.  
+- Link to download the thesis: https://urn.fi/URN:NBN:fi:tuni-202202222105  
 - Developed with connection to LND version 0.13.1-beta.  
 - Tested with Java SE 13.0.2.  
 - Files in the protocol images directory give an explanation of the protocol sequence.  
